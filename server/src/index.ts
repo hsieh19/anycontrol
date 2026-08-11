@@ -2,16 +2,24 @@ import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
 
-// 优先加载项目根目录 .env，兼容本地 server 目录与 Docker 运行环境
+// 全局异常捕获，确保异常能输出完整堆栈而非静默退出
+process.on('uncaughtException', (err) => {
+  console.error('[CRITICAL] 未捕获的同步异常 (uncaughtException):', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[CRITICAL] 未处理的异步 Promise 拒绝 (unhandledRejection):', reason);
+});
+
+// 仅在本地开发环境中存在 .env 文件时加载，避免生产环境刷屏提示
 const rootEnvPath = path.resolve(__dirname, '../../.env');
 const localEnvPath = path.resolve(__dirname, '../.env');
 if (fs.existsSync(rootEnvPath)) {
-  dotenv.config({ path: rootEnvPath });
+  dotenv.config({ path: rootEnvPath, quiet: true });
 } else if (fs.existsSync(localEnvPath)) {
-  dotenv.config({ path: localEnvPath });
-} else {
-  dotenv.config();
+  dotenv.config({ path: localEnvPath, quiet: true });
 }
+
 import express from 'express';
 import http from 'http';
 import cors from 'cors';

@@ -43,8 +43,8 @@ RUN npm prune --production
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-# 设置时区为亚洲/上海 (工业环境标准)
-RUN apk add --no-cache tzdata \
+# 设置时区为亚洲/上海，并安装 libstdc++ 运行时支持 (better-sqlite3 等原生 C++ 模块必须依赖)
+RUN apk add --no-cache tzdata libstdc++ \
     && cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && echo "Asia/Shanghai" > /etc/timezone
 
