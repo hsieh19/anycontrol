@@ -16,18 +16,31 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build-and-push:
-    name: 构建 Docker 镜像并推送至 GitHub Packages
-    runs-on: ubuntu-latest
+  # -----------------------------------------------------------------------
+  # Job 1: 在各自原生硬件 Runner 上分别构建各架构镜像
+  # 避免使用 QEMU 模拟构建 better-sqlite3 等原生 C++ 模块，防止 SIGSEGV 崩溃
+  # -----------------------------------------------------------------------
+  build:
+    name: 构建 ${{ matrix.platform }} 原生镜像
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
       packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 1. 动态解析提取软件版本号 (优先从软件 Tag 提取，其次从根目录 package.json 提取)
+      # 1. 动态解析提取软件版本号
       - name: Extract Version
         id: get_version
         run: |
@@ -47,10 +60,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 3. 设置 QEMU 模拟器与 Docker Buildx 多架构构建套件 (支持 AMD64 与 ARM64/树莓派/工控机)
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
+      # 3. 设置 Docker Buildx (单平台原生构建，无需 QEMU)
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -60,17 +70,70 @@ jobs:
         run: |
           echo "IMAGE_NAME_LOWER=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
-      # 5. 构建并 Push 工业级多平台镜像 (linux/amd64, linux/arm64)
-      - name: Build and push Docker image
+      # 5. 将平台名称转换为合法的 Docker tag 后缀 (linux/amd64 -> linux-amd64)
+      - name: Prepare platform tag suffix
+        id: platform
+        run: |
+          echo "TAG=$(echo '${{ matrix.platform }}' | tr '/' '-')" >> $GITHUB_OUTPUT
+
+      # 6. 在原生硬件上构建单平台镜像并 Push 到临时 tag
+      - name: Build and push by digest
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ matrix.platform }}
           push: true
-          tags: |
-            ${{ steps.string.outputs.IMAGE_NAME_LOWER }}:latest
-            ${{ steps.string.outputs.IMAGE_NAME_LOWER }}:${{ steps.get_version.outputs.VERSION }}
-            ${{ steps.string.outputs.IMAGE_NAME_LOWER }}:v${{ steps.get_version.outputs.VERSION }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ steps.string.outputs.IMAGE_NAME_LOWER }}:${{ steps.platform.outputs.TAG }}
+          cache-from: type=gha,scope=${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
+
+  # -----------------------------------------------------------------------
+  # Job 2: 合并各架构镜像，创建 Multi-arch Manifest 并打 latest/版本 Tag
+  # -----------------------------------------------------------------------
+  merge:
+    name: 合并多架构 Manifest 并发布
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract Version
+        id: get_version
+        run: |
+          if [[ "${GITHUB_REF}" =~ ^refs/tags/(app-v?|v?)([0-9]+\.[0-9]+\.[0-9]+.*) ]]; then
+            VERSION="${BASH_REMATCH[2]}"
+          else
+            VERSION=$(jq -r '.version' package.json)
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Downcase image name
+        id: string
+        run: |
+          echo "IMAGE_NAME_LOWER=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      # 7. 使用 docker manifest 合并两个平台的单独镜像为一个 Multi-arch 镜像
+      - name: Create and push multi-arch manifest
+        run: |
+          IMAGE="${{ steps.string.outputs.IMAGE_NAME_LOWER }}"
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
+
+          docker buildx imagetools create \
+            --tag "${IMAGE}:latest" \
+            --tag "${IMAGE}:${VERSION}" \
+            --tag "${IMAGE}:v${VERSION}" \
+            "${IMAGE}:linux-amd64" \
+            "${IMAGE}:linux-arm64"
