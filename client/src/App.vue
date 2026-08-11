@@ -1,5 +1,90 @@
 <template>
-  <div class="app-layout">
+  <!-- 1. 未登录状态：呈现专属全屏工业级登录界面 (Full-Screen Industrial Auth Portal) -->
+  <div v-if="!store.isLoggedIn" class="auth-fullscreen-layout">
+    <!-- 工业级背景动态光晕与网格 -->
+    <div class="auth-bg-glow"></div>
+    <div class="auth-bg-grid"></div>
+
+    <div class="auth-card-glass">
+      <div class="auth-brand-header">
+        <div class="auth-logo-box">
+          <svg class="logo-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+            <polyline points="2 17 12 22 22 17"></polyline>
+            <polyline points="2 12 12 17 22 12"></polyline>
+          </svg>
+        </div>
+        <h1 class="auth-title">AnyControl</h1>
+        <p class="auth-subtitle">工业设备控制与实时审计平台</p>
+      </div>
+
+      <!-- 飞书快捷免登区域 -->
+      <div class="feishu-login-section">
+        <el-button 
+          type="primary" 
+          class="btn-feishu-login" 
+          :loading="feishuLoggingIn" 
+          @click="handleFeishuLogin"
+        >
+          <svg class="feishu-svg-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z"/>
+          </svg>
+          飞书账号一键快捷免登
+        </el-button>
+        <div class="feishu-hint" v-if="isFeishuEnv">
+          <span class="pulse-dot"></span> 检测到处于飞书客户端环境，已就绪免登
+        </div>
+      </div>
+
+      <div class="auth-divider">
+        <span>或使用工控操作员账号登录</span>
+      </div>
+
+      <!-- 传统密码登录表单 -->
+      <div class="auth-form-box">
+        <div class="form-item-row">
+          <el-input 
+            v-model="loginForm.username" 
+            placeholder="操作员账号 (例如: admin)" 
+            size="large"
+            @keyup.enter="handlePasswordLogin"
+          >
+            <template #prefix>
+              <span class="input-icon">👤</span>
+            </template>
+          </el-input>
+        </div>
+
+        <div class="form-item-row">
+          <el-input 
+            v-model="loginForm.password" 
+            type="password" 
+            placeholder="密码 (默认: admin123)" 
+            size="large"
+            show-password
+            @keyup.enter="handlePasswordLogin"
+          >
+            <template #prefix>
+              <span class="input-icon">🔒</span>
+            </template>
+          </el-input>
+        </div>
+
+        <el-button 
+          type="primary" 
+          size="large" 
+          class="btn-submit-login" 
+          :loading="passwordLoggingIn"
+          @click="handlePasswordLogin"
+        >
+          立即登录进入系统
+        </el-button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. 已登录状态：完整渲染工业控制管理控制台 (App Layout) -->
+  <div v-else class="app-layout">
     <!-- Left Sidebar -->
     <aside class="sidebar">
       <!-- Logo & Title -->
@@ -119,11 +204,11 @@
         </div>
 
         <div class="version-info">
-          <span>v1.0.0 Industrial Standard</span>
+          <span>v{{ store.appVersion }} Industrial Standard</span>
         </div>
 
-        <!-- Current Operator Profile / Login Dropdown -->
-        <el-dropdown trigger="click" placement="top-start" v-if="store.isLoggedIn">
+        <!-- Current Operator Profile / Dropdown Menu -->
+        <el-dropdown trigger="click" placement="top-start">
           <div class="user-card-sidebar" title="点击展开用户操作菜单">
             <div class="user-avatar-sm" :class="`role-${store.currentUser.role.toLowerCase()}`">
               <img v-if="store.currentUser.avatarUrl" :src="store.currentUser.avatarUrl" class="avatar-img" />
@@ -142,23 +227,12 @@
               <el-dropdown-item @click="store.currentTab = 'users'">
                 👥 用户与权限管理
               </el-dropdown-item>
-              <el-dropdown-item @click="openFeishuConfigModal">
-                ⚙️ 飞书应用集成配置
-              </el-dropdown-item>
               <el-dropdown-item divided @click="handleLogout" style="color: #f43f5e;">
                 🚪 退出当前登录
               </el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-
-        <div v-else class="user-card-sidebar login-trigger-card" @click="showLoginModal = true">
-          <div class="user-avatar-sm role-viewer">🔑</div>
-          <div class="user-info-text">
-            <span class="user-display-name text-cyan">未登录</span>
-            <span class="user-role-name">点击登录 / 飞书免登</span>
-          </div>
-        </div>
       </div>
     </aside>
 
@@ -369,134 +443,6 @@
         <el-button @click="backupModalVisible = false">关闭</el-button>
       </template>
     </el-dialog>
-
-    <!-- Login Modal (飞书免登 / 账号登录) -->
-    <el-dialog
-      v-model="showLoginModal"
-      width="460px"
-      :show-close="store.isLoggedIn"
-      :close-on-click-modal="false"
-      :close-on-press-escape="store.isLoggedIn"
-      class="login-dialog-glass"
-    >
-      <div class="login-modal-body">
-        <div class="login-brand-header">
-          <div class="login-logo-box">
-            <svg class="logo-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-              <polyline points="2 17 12 22 22 17"></polyline>
-              <polyline points="2 12 12 17 22 12"></polyline>
-            </svg>
-          </div>
-          <h3>AnyControl 工业控制平台</h3>
-          <p class="login-subtitle">请选择身份验证方式以进入工业控制与审计系统</p>
-        </div>
-
-        <!-- 飞书快捷登录区域 -->
-        <div class="feishu-login-section">
-          <el-button 
-            type="primary" 
-            class="btn-feishu-login" 
-            :loading="feishuLoggingIn" 
-            @click="handleFeishuLogin"
-          >
-            <svg class="feishu-svg-icon" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z"/>
-            </svg>
-            飞书账号一键快捷登录
-          </el-button>
-          <div class="feishu-hint" v-if="isFeishuEnv">
-            <span class="pulse-dot"></span> 检测到处于飞书客户端环境，已就绪免登
-          </div>
-        </div>
-
-        <div class="login-divider">
-          <span>或使用工控操作员账号登录</span>
-        </div>
-
-        <!-- 传统密码登录表单 -->
-        <div class="login-form-box">
-          <div class="form-item-row">
-            <el-input 
-              v-model="loginForm.username" 
-              placeholder="操作员账号 (例如: admin)" 
-              size="large"
-              @keyup.enter="handlePasswordLogin"
-            >
-              <template #prefix>
-                <span class="input-icon">👤</span>
-              </template>
-            </el-input>
-          </div>
-
-          <div class="form-item-row">
-            <el-input 
-              v-model="loginForm.password" 
-              type="password" 
-              placeholder="密码 (默认: admin123)" 
-              size="large"
-              show-password
-              @keyup.enter="handlePasswordLogin"
-            >
-              <template #prefix>
-                <span class="input-icon">🔒</span>
-              </template>
-            </el-input>
-          </div>
-
-          <el-button 
-            type="primary" 
-            size="large" 
-            class="btn-submit-login" 
-            :loading="passwordLoggingIn"
-            @click="handlePasswordLogin"
-          >
-            立即登录
-          </el-button>
-        </div>
-
-        <!-- 底部飞书配置入口 -->
-        <div class="login-footer-links">
-          <el-link type="info" :underline="false" @click="openFeishuConfigModal">
-            ⚙️ 配置飞书开放平台应用参数 (App ID / Secret)
-          </el-link>
-        </div>
-      </div>
-    </el-dialog>
-
-    <!-- 飞书开放平台应用配置 Modal -->
-    <el-dialog
-      v-model="feishuConfigModalVisible"
-      title="⚙️ 飞书开放平台集成配置"
-      width="540px"
-      :close-on-click-modal="false"
-    >
-      <div class="feishu-config-form">
-        <p class="form-tip">
-          请在 <a href="https://open.feishu.cn/" target="_blank" class="text-cyan">飞书开放平台</a> 创建企业自建应用，获取 App ID 与 App Secret，并在「安全设置」中将重定向 URL 配置为当前平台地址。
-        </p>
-
-        <el-form label-position="top">
-          <el-form-item label="飞书 App ID (应用唯一标识)">
-            <el-input v-model="feishuConfigForm.appId" placeholder="例如：cli_a1b2c3d4e5f6..." />
-          </el-form-item>
-
-          <el-form-item label="飞书 App Secret (应用凭证密钥)">
-            <el-input v-model="feishuConfigForm.appSecret" type="password" show-password placeholder="例如：xYz123456789..." />
-          </el-form-item>
-
-          <el-form-item label="重定向回调地址 (Redirect URI)">
-            <el-input v-model="feishuConfigForm.redirectUri" disabled />
-          </el-form-item>
-        </el-form>
-      </div>
-      <template #footer>
-        <el-button @click="feishuConfigModalVisible = false">取消</el-button>
-        <el-button type="primary" :loading="savingFeishuConfig" @click="handleSaveFeishuConfig">
-          保存配置
-        </el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -666,41 +612,6 @@ const loginForm = reactive({
   password: ''
 });
 
-// Feishu Config Modal State
-const feishuConfigModalVisible = ref(false);
-const savingFeishuConfig = ref(false);
-const feishuConfigForm = reactive({
-  appId: '',
-  appSecret: '',
-  redirectUri: window.location.origin + window.location.pathname
-});
-
-const openFeishuConfigModal = async () => {
-  try {
-    const config = await api.getFeishuConfig();
-    feishuConfigForm.appId = config.appId || '';
-    feishuConfigForm.redirectUri = config.redirectUri || (window.location.origin + window.location.pathname);
-  } catch (e) {}
-  feishuConfigModalVisible.value = true;
-};
-
-const handleSaveFeishuConfig = async () => {
-  if (!feishuConfigForm.appId) {
-    ElMessage.warning('请输入飞书 App ID');
-    return;
-  }
-  savingFeishuConfig.value = true;
-  try {
-    await api.saveFeishuConfig(feishuConfigForm.appId, feishuConfigForm.appSecret);
-    ElMessage.success('飞书应用配置已更新保存');
-    feishuConfigModalVisible.value = false;
-  } catch (e: any) {
-    ElMessage.error('保存失败: ' + e.message);
-  } finally {
-    savingFeishuConfig.value = false;
-  }
-};
-
 const loadFeishuSdk = () => new Promise<void>((resolve, reject) => {
   if ((window as any).h5sdk) return resolve();
   const script = document.createElement('script');
@@ -732,15 +643,13 @@ const handleFeishuLogin = async () => {
     const config = await api.getFeishuConfig();
     if (!config || !config.appId) {
       ElMessageBox.alert(
-        '当前系统尚未配置飞书开放平台的 App ID 与 App Secret，无法发起飞书第三方授权登录。\n\n请先点击下方「配置飞书应用参数」录入飞书凭据，或直接使用操作员账号密码（admin / admin123）登录。',
-        '飞书集成参数未配置',
+        '当前系统尚未配置飞书开放平台 App ID 与 App Secret，无法发起飞书授权登录。\n\n请联系系统管理员在服务器端环境变量或后台数据库完成配置，或使用工控操作员账号密码直接登录。',
+        '飞书开放平台未配置',
         {
-          confirmButtonText: '去配置飞书参数',
-          type: 'warning'
+          confirmButtonText: '确定',
+          type: 'info'
         }
-      ).then(() => {
-        openFeishuConfigModal();
-      }).catch(() => {});
+      );
       feishuLoggingIn.value = false;
       return;
     }
@@ -797,8 +706,8 @@ const handlePasswordLogin = async () => {
     if (res.success && res.data) {
       store.setUser(res.data.user, res.data.token);
       ElMessage.success(`登录成功，欢迎：${res.data.user.name}`);
-      showLoginModal.value = false;
       await store.refreshAll();
+      store.initWebSocket();
     }
   } catch (e: any) {
     ElMessage.error(e.response?.data?.message || e.message || '登录失败，请检查账号或密码');
@@ -814,12 +723,12 @@ const handleLogout = () => {
     cancelButtonText: '取消'
   }).then(() => {
     store.logout();
-    ElMessage.info('已退出登录');
-    showLoginModal.value = true;
+    ElMessage.info('已安全退出系统');
   });
 };
 
-const checkUrlAuthCode = async () => {
+const initAuthAndData = async () => {
+  // 1. 检查 URL 中的飞书 OAuth 回调授权码
   const urlParams = new URLSearchParams(window.location.search);
   const code = urlParams.get('code');
   if (code) {
@@ -831,9 +740,9 @@ const checkUrlAuthCode = async () => {
       const res = await api.loginWithFeishu(code);
       if (res.success && res.data) {
         store.setUser(res.data.user, res.data.token);
-        ElMessage.success(`飞书认证成功！欢迎操作员：${res.data.user.name}`);
-        showLoginModal.value = false;
+        ElMessage.success(`飞书认证成功！欢迎：${res.data.user.name}`);
         await store.refreshAll();
+        store.initWebSocket();
         return;
       }
     } catch (e: any) {
@@ -841,21 +750,19 @@ const checkUrlAuthCode = async () => {
     }
   }
 
-  // Check stored auth
+  // 2. 检查本地 Storage 中的 Token 状态
   const hasAuth = store.checkStoredAuth();
-  if (!hasAuth) {
-    showLoginModal.value = true;
-    // If not logged in, auto-attempt silent login if in Feishu
-    if (isFeishuEnv.value) {
-      handleFeishuLogin();
-    }
+  if (hasAuth) {
+    await store.refreshAll();
+    store.initWebSocket();
+  } else if (isFeishuEnv.value) {
+    // 若在飞书客户端内，尝试静默快捷免登
+    handleFeishuLogin();
   }
 };
 
 onMounted(() => {
-  checkUrlAuthCode();
-  store.refreshAll();
-  store.initWebSocket();
+  initAuthAndData();
 });
 </script>
 
@@ -1389,7 +1296,73 @@ onMounted(() => {
   padding: 8px 4px;
 }
 
-.login-brand-header {
+/* ===================================================
+   全屏工业级登录门户 (Full-Screen Auth Portal)
+   =================================================== */
+.auth-fullscreen-layout {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background-color: #0b1120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  user-select: none;
+}
+
+.auth-bg-glow {
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(6, 182, 212, 0.15) 0%, rgba(59, 130, 246, 0.08) 40%, transparent 70%);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  filter: blur(40px);
+  pointer-events: none;
+}
+
+.auth-bg-grid {
+  position: absolute;
+  inset: 0;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+
+.auth-card-glass {
+  position: relative;
+  z-index: 10;
+  width: 440px;
+  max-width: 90vw;
+  padding: 36px 32px;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(6, 182, 212, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  animation: authFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes authFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.auth-brand-header {
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -1397,28 +1370,31 @@ onMounted(() => {
   gap: 8px;
 }
 
-.login-logo-box {
-  width: 44px;
-  height: 44px;
-  background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(59, 130, 246, 0.2));
-  border: 1px solid rgba(6, 182, 212, 0.4);
-  border-radius: 12px;
+.auth-logo-box {
+  width: 52px;
+  height: 52px;
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.25), rgba(59, 130, 246, 0.25));
+  border: 1px solid rgba(6, 182, 212, 0.5);
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--accent-cyan);
+  box-shadow: 0 0 16px rgba(6, 182, 212, 0.3);
 }
 
-.login-brand-header h3 {
-  font-size: 18px;
-  font-weight: 700;
+.auth-title {
+  font-size: 24px;
+  font-weight: 800;
   color: #f8fafc;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.8px;
+  margin: 0;
 }
 
-.login-subtitle {
-  font-size: 12px;
+.auth-subtitle {
+  font-size: 13px;
   color: var(--text-secondary);
+  margin: 0;
 }
 
 .feishu-login-section {
@@ -1471,7 +1447,7 @@ onMounted(() => {
   box-shadow: 0 0 6px #34d399;
 }
 
-.login-divider {
+.auth-divider {
   display: flex;
   align-items: center;
   text-align: center;
@@ -1479,18 +1455,18 @@ onMounted(() => {
   font-size: 11px;
 }
 
-.login-divider::before,
-.login-divider::after {
+.auth-divider::before,
+.auth-divider::after {
   content: '';
   flex: 1;
   border-bottom: 1px solid var(--border-color);
 }
 
-.login-divider span {
+.auth-divider span {
   padding: 0 10px;
 }
 
-.login-form-box {
+.auth-form-box {
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -1512,27 +1488,5 @@ onMounted(() => {
   font-weight: 600;
   border-radius: 6px;
   margin-top: 4px;
-}
-
-.login-footer-links {
-  text-align: center;
-  padding-top: 6px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.feishu-config-form {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.form-tip {
-  font-size: 12px;
-  color: var(--text-secondary);
-  line-height: 1.5;
-  background: rgba(6, 182, 212, 0.08);
-  border: 1px solid rgba(6, 182, 212, 0.2);
-  padding: 10px 14px;
-  border-radius: 6px;
 }
 </style>

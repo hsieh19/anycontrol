@@ -103,6 +103,9 @@ export const useAppStore = defineStore('app', () => {
     return controlTemplates.value.find(t => t.id === selectedDevice.value?.protocolTemplateId) || null;
   });
 
+  // Version
+  const appVersion = ref(typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.0.1');
+
   // Fetch all core data
   const refreshAll = async () => {
     try {
@@ -116,6 +119,15 @@ export const useAppStore = defineStore('app', () => {
       controlTemplates.value = tpls;
       users.value = userList;
       auditLogs.value = logs;
+
+      // 核心：自动同步当前登录用户的最新角色与权限信息（提权即刻生效）
+      if (currentUser.value && userList && userList.length > 0) {
+        const latestSelf = userList.find(u => u.id === currentUser.value.id || u.username === currentUser.value.username);
+        if (latestSelf) {
+          currentUser.value = { ...currentUser.value, ...latestSelf };
+          localStorage.setItem('anycontrol_user', JSON.stringify(currentUser.value));
+        }
+      }
 
       // Select first device if not selected
       if (!selectedDeviceId.value && tree.length > 0 && tree[0].children.length > 0) {
@@ -226,6 +238,7 @@ export const useAppStore = defineStore('app', () => {
     triggerAddProtocol,
     triggerAddUser,
     refreshAll,
-    initWebSocket
+    initWebSocket,
+    appVersion
   };
 });

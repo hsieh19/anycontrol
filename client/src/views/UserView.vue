@@ -63,11 +63,11 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
             <el-button size="small" type="primary" link @click="openUserDialog(row)">编辑授权</el-button>
             <el-button 
-              v-if="row.role !== 'ADMIN'" 
+              v-if="row.id !== store.currentUser.id" 
               size="small" 
               type="danger" 
               link 
@@ -75,6 +75,7 @@
             >
               删除
             </el-button>
+            <span v-else class="text-muted text-xs" style="margin-left: 8px;">(当前登录)</span>
           </template>
         </el-table-column>
       </el-table>
@@ -245,13 +246,23 @@ const saveUserForm = async () => {
 };
 
 const handleDeleteUser = (user: User) => {
-  ElMessageBox.confirm(`确定删除用户 [${user.name}] 吗？`, '删除确认', { type: 'warning' }).then(async () => {
+  const isAdmin = user.role === 'ADMIN';
+  const tip = isAdmin 
+    ? `确定要删除系统管理员账号 [${user.name} (@${user.username})] 吗？删除后该管理员将永久失去系统控制权限！`
+    : `确定删除用户 [${user.name} (@${user.username})] 吗？`;
+
+  ElMessageBox.confirm(tip, '删除账号确认', {
+    type: 'warning',
+    confirmButtonText: '确认删除',
+    cancelButtonText: '取消',
+    confirmButtonClass: 'el-button--danger'
+  }).then(async () => {
     try {
-      await api.deleteUser(user.id);
-      ElMessage.success('用户已删除');
+      const res = await api.deleteUser(user.id);
+      ElMessage.success(res.message || '用户账号已成功删除');
       await loadData();
     } catch (e: any) {
-      ElMessage.error('删除用户失败: ' + e.message);
+      ElMessage.error(e.response?.data?.message || e.message || '删除用户失败');
     }
   });
 };

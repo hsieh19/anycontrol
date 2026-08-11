@@ -1,4 +1,4 @@
-﻿import { Router, Request, Response } from "express";
+import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { db } from "./infrastructure/db";
 import { feishuService } from "./infrastructure/feishu";
@@ -91,12 +91,17 @@ apiRouter.post("/feishu/login", async (req: Request, res: Response) => {
     let user = db.getUserByFeishuId(user_id, open_id);
 
     if (!user) {
+      // 检查当前系统内是否已有飞书绑定的管理员
+      const allUsers = db.getUsers();
+      const hasFeishuAdmin = allUsers.some(u => (u.feishuOpenId || u.feishuUserId) && u.role === "ADMIN");
+      const initialRole = !hasFeishuAdmin ? "ADMIN" : "OPERATOR";
+
       const newUserId = `usr-fs-${Date.now().toString(36)}`;
       user = {
         id: newUserId,
         username: `feishu_${open_id.slice(0, 8)}`,
-        name: name || "飞书现场操作员",
-        role: "OPERATOR",
+        name: name || (initialRole === "ADMIN" ? "飞书系统管理员" : "飞书现场操作员"),
+        role: initialRole,
         allowedDeviceIds: [],
         status: "ACTIVE",
         feishuOpenId: open_id,
@@ -270,9 +275,31 @@ apiRouter.post("/users", authenticate, requireRole("ADMIN"), (req: Request, res:
   res.json({ success: true, data: user });
 });
 
-apiRouter.delete("/users/:id", authenticate, requireRole("ADMIN"), (req: Request, res: Response) => {
-  const ok = userService.deleteUser(req.params.id);
-  res.json({ success: ok });
+apiRouter.delete("/users/:id", authenticate, requireRole("ADMIN"), (req: AuthRequest, res: Response) => {
+  const targetId = req.params.id;
+  const currentUserId = req.user?.id;
+
+  // 1. 禁止删除当前操作员自己
+  if (currentUserId && targetId === currentUserId) {
+    return res.status(400).json({ success: false, message: "无法删除当前正在登录的管理员账号" });
+  }
+
+  // 2. 检查待删除用户是否存在
+  const targetUser = db.getUserById(targetId);
+  if (!targetUser) {
+    return res.status(404).json({ success: false, message: "用户不存在或已被删除" });
+  }
+
+  // 3. 如果删除的是 ADMIN 角色，检查系统内剩余启用的 ADMIN 数量
+  if (targetUser.role === "ADMIN") {
+    const allAdmins = db.getUsers().filter(u => u.role === "ADMIN" && u.status === "ACTIVE" && u.id !== targetId);
+    if (allAdmins.length === 0) {
+      return res.status(400).json({ success: false, message: "系统必须保留至少一位启用的系统管理员账号，无法删除最后一位管理员" });
+    }
+  }
+
+  const ok = userService.deleteUser(targetId);
+  res.json({ success: ok, message: ok ? "用户账号已成功删除" : "删除失败" });
 });
 
 // =======================

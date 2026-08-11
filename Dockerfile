@@ -14,6 +14,7 @@ COPY client/package*.json ./
 RUN npm ci
 
 # 复制源码并构建
+COPY package.json /app/package.json
 COPY client/ ./
 RUN npm run build
 

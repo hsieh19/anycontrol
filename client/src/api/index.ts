@@ -162,8 +162,8 @@ export const saveUser = async (user: Partial<User>) => {
 };
 
 export const deleteUser = async (id: string) => {
-  const res = await api.delete<{ success: boolean }>(`/users/${id}`);
-  return res.data.success;
+  const res = await api.delete<{ success: boolean; message?: string }>(`/users/${id}`);
+  return res.data;
 };
 
 // Log API
