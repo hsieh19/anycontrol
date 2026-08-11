@@ -271,6 +271,21 @@ apiRouter.get("/users", authenticate, (req: Request, res: Response) => {
 });
 
 apiRouter.post("/users", authenticate, requireRole("ADMIN"), (req: Request, res: Response) => {
+  const targetId = req.body.id;
+  if (targetId) {
+    const existing = db.getUserById(targetId);
+    // 如果修改前是启用状态的管理员，而修改后不是 ADMIN 或被禁用
+    if (existing && existing.role === "ADMIN" && existing.status === "ACTIVE") {
+      const willBeAdmin = req.body.role === "ADMIN" && req.body.status !== "DISABLED";
+      if (!willBeAdmin) {
+        const otherAdmins = db.getUsers().filter(u => u.role === "ADMIN" && u.status === "ACTIVE" && u.id !== targetId);
+        if (otherAdmins.length === 0) {
+          return res.status(400).json({ success: false, message: "系统必须保留至少一位启用的系统管理员账号，无法将最后一位管理员降权或停用" });
+        }
+      }
+    }
+  }
+
   const user = userService.saveUser(req.body);
   res.json({ success: true, data: user });
 });

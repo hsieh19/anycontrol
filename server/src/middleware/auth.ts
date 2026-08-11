@@ -1,5 +1,6 @@
-﻿import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { db } from '../infrastructure/db';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-dev-secret-do-not-use-in-prod';
 const JWT_EXPIRES_IN = '8h';
@@ -24,7 +25,7 @@ export function signToken(payload: JwtPayload): string {
 
 /**
  * JWT 身份认证中间件
- * 从 Authorization: Bearer <token> 头部提取并验证令牌
+ * 从 Authorization: Bearer <token> 头部提取并验证令牌，并实时同步数据库中最新角色与状态
  */
 export function authenticate(req: AuthRequest, res: Response, next: NextFunction): any {
   const authHeader = req.headers.authorization;
@@ -35,7 +36,22 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
   const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
-    req.user = decoded;
+    
+    // 实时同步数据库中用户的最新角色与启用状态，解决提权后 Token 角色滞后问题
+    const liveUser = db.getUserById(decoded.id);
+    if (liveUser) {
+      if (liveUser.status === 'DISABLED') {
+        return res.status(403).json({ success: false, message: '您的账号已被停用，请联系系统管理员' });
+      }
+      req.user = {
+        id: liveUser.id,
+        username: liveUser.username,
+        role: liveUser.role
+      };
+    } else {
+      req.user = decoded;
+    }
+
     next();
   } catch (e: any) {
     const msg = e.name === 'TokenExpiredError'

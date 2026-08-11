@@ -171,11 +171,13 @@ static void handleHttpRoot() {
   html += "s.innerHTML=\"<div style='padding:12px;background:#e2e8f0;border-radius:6px;font-size:13px;color:#334155'>⏳ 正在连接云端校验更新，请稍候...</div>\"; ";
   html += "try{ let reqUrl='/api/ota/check' + (otaUrl ? ('?url=' + encodeURIComponent(otaUrl)) : ''); ";
   html += "let r=await fetch(reqUrl); let data=await r.json(); ";
+  html += "let vStr = (data.version || '').startsWith('v') ? data.version : ('v' + (data.version || '')); ";
   html += "if(data.found){ ";
-  html += "s.innerHTML=`<div style='background:#dcfce7;border-left:4px solid #16a34a;padding:12px;border-radius:6px;color:#14532d;font-size:13px'><b style='font-size:15px;color:#15803d;display:block;margin-bottom:6px'>🎉 发现新版本: v${data.version}</b><div style='white-space:pre-wrap;background:#fff;padding:10px;border-radius:4px;border:1px solid #bbf7d0'>${data.changelog}</div></div>`; ";
+  html += "let logText = (data.changelog && data.changelog.trim().length > 0) ? data.changelog.trim() : '（暂无详细更新日志）'; ";
+  html += "s.innerHTML=`<div style='background:#dcfce7;border-left:4px solid #16a34a;padding:12px 14px;border-radius:6px;color:#14532d;font-size:13px'><b style='font-size:15px;color:#15803d;display:block;margin-bottom:8px'>🎉 发现新版本: ${vStr}</b><div style='white-space:pre-wrap;word-break:break-word;background:#fff;padding:10px 12px;border-radius:4px;border:1px solid #bbf7d0;font-size:12px;line-height:1.6;color:#334155;max-height:260px;overflow-y:auto'>${logText}</div></div>`; ";
   html += "document.getElementById('btnDoUpdate').style.display='inline-block'; ";
   html += "} else { ";
-  html += "s.innerHTML=`<div style='padding:12px;background:#f0fdf4;border-radius:6px;border:1px solid #bbf7d0;color:#166534;font-size:13px'>✨ 当前已是最新版本 (v${data.version})</div>`; ";
+  html += "s.innerHTML=`<div style='padding:12px;background:#f0fdf4;border-radius:6px;border:1px solid #bbf7d0;color:#166534;font-size:13px'>✨ 当前已是最新版本 (${vStr})</div>`; ";
   html += "} }catch(e){ s.innerHTML=\"<div style='padding:12px;background:#fef2f2;border-radius:6px;border:1px solid #fecaca;color:#991b1b;font-size:13px'>❌ 检查失败，请检查网络连接或 OTA 服务端地址</div>\"; } }";
 
   html += "async function uiDoUpdate(){ if(!confirm('确认要执行系统固件在线升级吗？\\n升级过程中请勿断电，设备升级完成后将自动重启。'))return; ";
@@ -391,7 +393,7 @@ static void handleOtaCheck() {
     }
   }
   int result = checkOtaUpdate();
-  DynamicJsonDocument doc(512);
+  DynamicJsonDocument doc(4096);
   doc["found"] = (result == 1);
   doc["version"] = g_otaRemoteVersion != "" ? g_otaRemoteVersion : FIRMWARE_VERSION;
   doc["changelog"] = g_otaChangelog;

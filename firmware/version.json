@@ -1,5 +1,5 @@
-﻿{
-  "version": "1.0.0",
+{
+  "version": "1.0.1",
   "name": "AnyControl 工业智能网关固件",
   "chip": "ESP32C3",
   "project": "anycontrol"

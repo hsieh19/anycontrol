@@ -88,7 +88,7 @@ inline bool validateFirmwareExistence() {
     
     bool success = false;
     if (httpCode == 200) {
-        DynamicJsonDocument doc(1024);
+        DynamicJsonDocument doc(4096);
         deserializeJson(doc, http.getString());
         g_otaValidatedUrl = doc["url"] | ""; 
         if (g_otaValidatedUrl != "") success = true;
@@ -118,12 +118,29 @@ inline int checkOtaUpdate() {
     int httpCode = http.GET();
 
     if (httpCode == 200) {
-        DynamicJsonDocument doc(1024);
-        deserializeJson(doc, http.getString());
+        DynamicJsonDocument doc(4096);
+        DeserializationError err = deserializeJson(doc, http.getString());
+        if (err) {
+            APP_LOG("[OTA] JSON parse error: %s", err.c_str());
+            http.end();
+            return -1;
+        }
+
         g_otaRemoteVersion = doc["version"] | "";
         g_otaChangelog = doc["changelog"] | "";
         g_otaValidatedUrl = doc["url"] | "";
-        if (g_otaRemoteVersion != "" && g_otaRemoteVersion != FIRMWARE_VERSION) {
+
+        // 统一去除可能存在的前缀 'v'/'V' 后进行版本差异比对
+        String cleanRemote = g_otaRemoteVersion;
+        if (cleanRemote.startsWith("v") || cleanRemote.startsWith("V")) {
+            cleanRemote = cleanRemote.substring(1);
+        }
+        String cleanLocal = String(FIRMWARE_VERSION);
+        if (cleanLocal.startsWith("v") || cleanLocal.startsWith("V")) {
+            cleanLocal = cleanLocal.substring(1);
+        }
+
+        if (cleanRemote.length() > 0 && cleanRemote != cleanLocal) {
             g_otaUpdateFound = true;
             return 1;
         }

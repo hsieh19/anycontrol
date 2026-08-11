@@ -22,7 +22,7 @@ static const int PIN_MASTER_TX  = 21;
 // -----------------------
 // 2. 常量定义
 // -----------------------
-#define FIRMWARE_VERSION "1.0.0"
+#define FIRMWARE_VERSION "1.0.1"
 
 static constexpr const char *WIFI_AP_SSID = "AnyControl_AP";
 static constexpr const char *WIFI_AP_PASSWORD = "12345678";

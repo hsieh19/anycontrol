@@ -139,7 +139,7 @@ jobs:
 
           # 3. 生成 Full Firmware manifest.json (AnyFlash 网页读取)
           FULL_MD5=$(md5sum "${FULL_DIR}/${FULL_BIN_NAME}" | cut -d ' ' -f 1)
-          RELEASE_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          RELEASE_TIME=$(TZ='Asia/Shanghai' date +"%Y-%m-%dT%H:%M:%S+08:00")
           python3 -c "
           import json
           data = {
@@ -157,7 +157,7 @@ jobs:
           cp ./build/${SKETCH_NAME}.bin "${OTA_DIR}/${OTA_BIN_NAME}"
 
           # 5. 提取 CHANGELOG 并生成 OTA manifest.json (AnyFlash Worker /api/ota/check 读取)
-          RELEASE_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          RELEASE_TIME=$(TZ='Asia/Shanghai' date +"%Y-%m-%dT%H:%M:%S+08:00")
           OTA_MD5=$(md5sum "${OTA_DIR}/${OTA_BIN_NAME}" | cut -d ' ' -f 1)
           if [ -f "${CHANGELOG_PATH}" ]; then
             awk "/## \[${VERSION}\]/{flag=1;next}/## \[/{flag=0}flag" "${CHANGELOG_PATH}" > temp_changelog.txt
