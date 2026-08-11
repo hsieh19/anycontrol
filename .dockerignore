@@ -1,0 +1,27 @@
+# 版本控制与文档
+.git
+.gitignore
+.dockerignore
+README.md
+
+# 依赖与产物
+node_modules
+client/node_modules
+server/node_modules
+client/dist
+server/dist
+
+# 本地环境变量与日志
+.env
+.env.*
+*.log
+logs
+
+# 固件代码 (固件烧录在 ESP32 硬件上，无需打入上位机容器)
+firmware/
+
+# IDE 与系统临时文件
+.vscode
+.idea
+.DS_Store
+Thumbs.db

@@ -1,0 +1,14 @@
+{
+  "name": "anycontrol-industrial-web",
+  "version": "1.0.0",
+  "description": "Industrial Web Control and Audit System",
+  "scripts": {
+    "server:dev": "npm --prefix server run dev",
+    "client:dev": "npm --prefix client run dev",
+    "dev": "npm run server:dev",
+    "build": "npm --prefix server run build && npm --prefix client run build"
+  },
+  "keywords": ["industrial", "modbus", "scada", "vue3", "typescript"],
+  "author": "Antigravity",
+  "license": "MIT"
+}

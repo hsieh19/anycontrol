@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  anycontrol-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: anycontrol:latest
+    container_name: anycontrol-industrial
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    volumes:
+      # 持久化挂载设备/网关配置与操作日志
+      - anycontrol-data:/app/server/data
+
+volumes:
+  anycontrol-data:
+    driver: local
