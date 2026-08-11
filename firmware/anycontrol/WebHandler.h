@@ -166,6 +166,24 @@ static void handleHttpRoot() {
   html += "}catch(e){} }";
   html += "setInterval(refreshSysStats, 3000); refreshSysStats();";
 
+  // 轻量 Markdown 渲染器（支持 ###/##/#、**bold**、`code`、- 列表、--- 分割线）
+  html += "function mdToHtml(md){ ";
+  html += "let lines=md.split('\\n'); let out=''; let inList=false; ";
+  html += "for(let i=0;i<lines.length;i++){ let ln=lines[i]; ";
+  // 水平分割线
+  html += "if(/^-{3,}$/.test(ln.trim())){ if(inList){out+='</ul>';inList=false;} out+='<hr style=\"border:none;border-top:1px solid #d1fae5;margin:8px 0\">'; continue; } ";
+  // 标题 ###
+  html += "let hm=ln.match(/^(#{1,3})\\s+(.+)/); if(hm){ if(inList){out+='</ul>';inList=false;} let sz=hm[1].length; let fs=['15px','14px','13px'][sz-1]||'13px'; let fw=sz===1?'700':'600'; out+='<div style=\"font-size:'+fs+';font-weight:'+fw+';color:#15803d;margin:10px 0 4px\">'+hm[2]+'</div>'; continue; } ";
+  // 列表项 -
+  html += "let lm=ln.match(/^\\s*-\\s+(.*)/); if(lm){ if(!inList){out+='<ul style=\"margin:4px 0 4px 16px;padding:0\">'; inList=true;} ";
+  html += "let li=lm[1].replace(/\\*\\*(.+?)\\*\\*/g,'<b>$1</b>').replace(/`([^`]+)`/g,'<code style=\"background:#f0fdf4;padding:1px 4px;border-radius:3px;font-size:11px\">$1</code>'); ";
+  html += "out+='<li style=\"margin:2px 0;line-height:1.5;color:#374151\">'+li+'</li>'; continue; } ";
+  // 普通行
+  html += "if(inList){out+='</ul>';inList=false;} ";
+  html += "let pl=ln.replace(/\\*\\*(.+?)\\*\\*/g,'<b>$1</b>').replace(/`([^`]+)`/g,'<code style=\"background:#f0fdf4;padding:1px 4px;border-radius:3px;font-size:11px\">$1</code>'); ";
+  html += "if(pl.trim()!=='') out+='<div style=\"line-height:1.6;color:#374151;margin:2px 0\">'+pl+'</div>'; ";
+  html += "} if(inList){out+='</ul>';} return out; }";
+
   html += "async function uiCheckOta(){ let s=document.getElementById('otaInfo'); ";
   html += "let urlInp=document.getElementById('otaApi'); let otaUrl=urlInp?urlInp.value.trim():''; ";
   html += "s.innerHTML=\"<div style='padding:12px;background:#e2e8f0;border-radius:6px;font-size:13px;color:#334155'>⏳ 正在连接云端校验更新，请稍候...</div>\"; ";
@@ -173,8 +191,8 @@ static void handleHttpRoot() {
   html += "let r=await fetch(reqUrl); let data=await r.json(); ";
   html += "let vStr = (data.version || '').startsWith('v') ? data.version : ('v' + (data.version || '')); ";
   html += "if(data.found){ ";
-  html += "let logText = (data.changelog && data.changelog.trim().length > 0) ? data.changelog.trim() : '（暂无详细更新日志）'; ";
-  html += "s.innerHTML=`<div style='background:#dcfce7;border-left:4px solid #16a34a;padding:12px 14px;border-radius:6px;color:#14532d;font-size:13px'><b style='font-size:15px;color:#15803d;display:block;margin-bottom:8px'>🎉 发现新版本: ${vStr}</b><div style='white-space:pre-wrap;word-break:break-word;background:#fff;padding:10px 12px;border-radius:4px;border:1px solid #bbf7d0;font-size:12px;line-height:1.6;color:#334155;max-height:260px;overflow-y:auto'>${logText}</div></div>`; ";
+  html += "let logHtml = (data.changelog && data.changelog.trim().length > 0) ? mdToHtml(data.changelog.trim()) : \"<span style='color:#94a3b8;font-size:12px'>（暂无详细更新日志）</span>\"; ";
+  html += "s.innerHTML=`<div style='background:#dcfce7;border-left:4px solid #16a34a;padding:12px 14px;border-radius:6px;color:#14532d;font-size:13px'><b style='font-size:15px;color:#15803d;display:block;margin-bottom:8px'>🎉 发现新版本: ${vStr}</b><div style='background:#fff;padding:10px 12px;border-radius:4px;border:1px solid #bbf7d0;font-size:12px;line-height:1.6;max-height:280px;overflow-y:auto'>${logHtml}</div></div>`; ";
   html += "document.getElementById('btnDoUpdate').style.display='inline-block'; ";
   html += "} else { ";
   html += "s.innerHTML=`<div style='padding:12px;background:#f0fdf4;border-radius:6px;border:1px solid #bbf7d0;color:#166534;font-size:13px'>✨ 当前已是最新版本 (${vStr})</div>`; ";
