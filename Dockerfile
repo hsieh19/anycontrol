@@ -23,6 +23,10 @@ RUN npm run build
 FROM node:20-bookworm-slim AS server-builder
 WORKDIR /app/server
 
+# 安装 node-gyp 原生 C++ 编译工具链 (供 better-sqlite3 编译)
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
+
 # 安装所有依赖并编译 TypeScript -> JavaScript
 COPY server/package*.json ./
 RUN npm ci
