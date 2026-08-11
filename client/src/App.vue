@@ -182,8 +182,8 @@
             <span class="stat-val font-mono text-cyan">{{ totalDevicesCount }}</span>
           </div>
 
-          <!-- Backup & Restore System Action -->
-          <div class="header-backup-btn">
+          <!-- Backup & Restore System Action (仅系统管理员可见) -->
+          <div class="header-backup-btn" v-if="store.currentUser.role === 'ADMIN'">
             <el-button 
               size="default" 
               plain
@@ -243,8 +243,9 @@
       </main>
     </div>
 
-    <!-- System Backup & Restore Modal -->
+    <!-- System Backup & Restore Modal (仅系统管理员可操作) -->
     <el-dialog
+      v-if="store.currentUser.role === 'ADMIN'"
       v-model="backupModalVisible"
       title="📦 系统全量配置备份与灾难恢复"
       width="680px"
@@ -522,6 +523,8 @@ const parsedBackupData = ref<any>(null);
 const restoreMode = ref<'OVERWRITE' | 'MERGE'>('OVERWRITE');
 
 const openBackupModal = () => {
+  // 纵深防御：函数内再次校验角色，防止非 ADMIN 用户通过其它途径触发
+  if (store.currentUser.role !== 'ADMIN') return;
   backupModalVisible.value = true;
 };
 

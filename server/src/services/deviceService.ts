@@ -133,14 +133,16 @@ export class DeviceService {
       if (res.ok) {
         const data = await res.json() as any;
         pushMsg = data.message || pushMsg;
+        // W6 修复：仅在 HTTP 推送成功时才标记为 ONLINE
+        gw.status = 'ONLINE';
       }
     } catch (e: any) {
-      // 现场设备未连接时记录警告但维持本地参数同步
+      // 现场设备未连接时记录警告，不修改当前在线状态
+      pushSuccess = false;
       console.warn(`[Push Config] 向物理设备 (${gw.ip}:${gw.managementPort || 80}) 发送失败: ${e.message}，已同步本地数据。`);
     }
 
     gw.lastSyncTime = new Date().toISOString();
-    gw.status = 'ONLINE';
     db.saveGateway(gw);
 
     return {
@@ -214,12 +216,9 @@ export class DeviceService {
         gw.status = 'ONLINE';
       }
     } catch (e: any) {
-      // 现场设备未连接真实硬件时保留平滑 fallback
-      gw.status = 'ONLINE';
-      gw.latencyMs = report.networkLatencyMs;
-      gw.wifiRssi = report.rssi;
-      gw.ramUsage = report.ram;
-      gw.chipTemp = report.chipTemp;
+      // W5 修复：HTTP 拉取失败说明设备不可达，不应设为 ONLINE
+      gw.status = 'OFFLINE';
+      console.warn(`[Pull Config] 无法连接固件 HTTP 接口 (${gw.ip}): ${e.message}`);
     }
 
     db.saveGateway(gw);

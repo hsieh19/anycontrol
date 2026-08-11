@@ -14,6 +14,31 @@ const api = axios.create({
   timeout: 10000
 });
 
+// C1 修复：每次请求自动携带 JWT Bearer Token
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('anycontrol_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// C1 修复：统一处理 401（令牌失效/过期），清除本地会话并刷新页面回到登录
+api.interceptors.response.use(
+  (res) => res,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('anycontrol_token');
+      localStorage.removeItem('anycontrol_user');
+      // 避免在登录页触发死循环
+      if (!window.location.href.includes('/login')) {
+        window.location.reload();
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Control API
 export const sendControlCommand = async (payload: {
   operator: string;

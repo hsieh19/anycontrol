@@ -255,7 +255,11 @@ static void handleApiGatewayConfig() {
     g_dualMasterConfig.wifiPort = wifiPort;
     g_prefs.putUShort("dmWPort", wifiPort);
   }
-  if (hbInt > 0) {
+  // I4 修复：心跳周期保存条件与 handleHttpConfig 统一（hbInt > 0 且字段存在）
+  bool hbIntPresent = (body.length() > 0)
+    ? (body.indexOf("heartbeatInterval") >= 0)
+    : g_httpServer.hasArg("heartbeatInterval");
+  if (hbIntPresent && hbInt > 0) {
     g_heartbeatInterval = hbInt;
     g_prefs.putUInt("hbInt", hbInt);
   }

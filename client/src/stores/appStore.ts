@@ -48,6 +48,22 @@ export const useAppStore = defineStore('app', () => {
       const storedToken = localStorage.getItem('anycontrol_token');
       const storedUser = localStorage.getItem('anycontrol_user');
       if (storedToken && storedUser) {
+        // I6 修复：解析 JWT Payload 检查 exp 字段，避免使用已过期令牌
+        try {
+          const payloadBase64 = storedToken.split('.')[1];
+          const payload = JSON.parse(atob(payloadBase64));
+          if (payload.exp && Math.floor(Date.now() / 1000) > payload.exp) {
+            // Token 已过期，清除本地会话
+            localStorage.removeItem('anycontrol_token');
+            localStorage.removeItem('anycontrol_user');
+            return false;
+          }
+        } catch (parseErr) {
+          // Token 格式无效，清除
+          localStorage.removeItem('anycontrol_token');
+          localStorage.removeItem('anycontrol_user');
+          return false;
+        }
         currentUser.value = JSON.parse(storedUser);
         authToken.value = storedToken;
         isLoggedIn.value = true;

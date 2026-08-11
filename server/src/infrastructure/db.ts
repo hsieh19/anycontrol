@@ -124,11 +124,14 @@ class DatabaseService {
     const idx = this.data.gateways.findIndex(g => g.id === gateway.id);
     if (idx >= 0) {
       this.data.gateways[idx] = { ...gateway, updatedAt: new Date().toISOString() };
+      this.persist();
+      return this.data.gateways[idx];
     } else {
-      this.data.gateways.push({ ...gateway, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+      const newGw = { ...gateway, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+      this.data.gateways.push(newGw);
+      this.persist();
+      return newGw;
     }
-    this.persist();
-    return gateway;
   }
 
   deleteGateway(id: string): boolean {
@@ -152,11 +155,14 @@ class DatabaseService {
     const idx = this.data.devices.findIndex(d => d.id === device.id);
     if (idx >= 0) {
       this.data.devices[idx] = { ...device, updatedAt: new Date().toISOString() };
+      this.persist();
+      return this.data.devices[idx];
     } else {
-      this.data.devices.push({ ...device, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+      const newDev = { ...device, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+      this.data.devices.push(newDev);
+      this.persist();
+      return newDev;
     }
-    this.persist();
-    return device;
   }
 
   deleteDevice(id: string): boolean {
@@ -202,11 +208,14 @@ class DatabaseService {
     const idx = this.data.controlTemplates.findIndex(t => t.id === template.id);
     if (idx >= 0) {
       this.data.controlTemplates[idx] = { ...template, updatedAt: new Date().toISOString() };
+      this.persist();
+      return this.data.controlTemplates[idx];
     } else {
-      this.data.controlTemplates.push({ ...template, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+      const newTpl = { ...template, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+      this.data.controlTemplates.push(newTpl);
+      this.persist();
+      return newTpl;
     }
-    this.persist();
-    return template;
   }
 
   deleteControlTemplate(id: string): boolean {

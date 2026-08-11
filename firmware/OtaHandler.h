@@ -65,11 +65,18 @@ static unsigned long g_lastOtaCheck = 0;
 /**
  * @brief 内部函数：获取并校验下载链接
  * @return true: 链接有效, false: 获取失败
+ *
+ * W8 安全说明：当前使用 setInsecure() 跳过 TLS 证书验证，存在中间人攻击风险。
+ * 生产环境建议：在此处通过 client.setCACert(OTA_SERVER_CA_CERT) 固定服务器根证书。
+ * 示例（以 Cloudflare 为例）：
+ *   static const char OTA_SERVER_CA_CERT[] PROGMEM = "-----BEGIN CERTIFICATE-----\n...";
+ *   client.setCACert(OTA_SERVER_CA_CERT);
  */
 inline bool validateFirmwareExistence() {
     if (g_otaRemoteVersion == "") return false;
 
     WiFiClientSecure client;
+    // TODO(W8): 生产环境请替换为 client.setCACert(OTA_SERVER_CA_CERT)
     client.setInsecure();
     HTTPClient http;
     String checkUrl = g_otaApiBase + "/api/ota/check?project=anycontrol&chip=ESP32C3";
@@ -94,11 +101,14 @@ inline bool validateFirmwareExistence() {
 
 /**
  * @brief 检查是否存在新版本
+ *
+ * W8 安全说明：同上，生产环境请配置 CA 证书固定。
  */
 inline int checkOtaUpdate() {
     if (WiFi.status() != WL_CONNECTED) return -2;
 
     WiFiClientSecure client;
+    // TODO(W8): 生产环境请替换为 client.setCACert(OTA_SERVER_CA_CERT)
     client.setInsecure();
     HTTPClient http;
     String checkUrl = g_otaApiBase + "/api/ota/check?project=anycontrol&chip=ESP32C3";

@@ -53,8 +53,9 @@ RUN npm ci --only=production
 # 复制编译后的后端产物
 COPY --from=server-builder /app/server/dist ./dist
 
-# 复制初始持久化数据
-COPY server/data ./data
+# I7 修复：不将 data 目录打包进镜像，由 docker-compose volume 挂载提供
+# 确保镜像中 data 目录存在（首次启动 Volume 为空时 db.ts 会自动初始化）
+RUN mkdir -p /app/server/data
 
 # 复制前端编译产物 (供后端静态托管)
 WORKDIR /app
