@@ -1,15 +1,23 @@
 # ============================================================
 # AnyControl 固件自动编译与发布到 AnyFlash R2 工作流
 # ============================================================
-# 触发方式：推送版本 Tag (如 git tag v1.0.0 && git push origin v1.0.0)
+# 触发条件：
+# 1. 推送固件专属版本标签 (如 git tag fw-v1.0.0 && git push origin fw-v1.0.0)
+# 2. 当主分支上 firmware/ 固件目录发生代码或版本变更时触发
+# 3. 支持 GitHub 页面手动一键触发 (workflow_dispatch)
 # ============================================================
 
 name: Build & Publish Firmware to AnyFlash R2
 
 on:
   push:
+    branches: [ "main", "master" ]
+    paths:
+      - 'firmware/**'
     tags:
-      - 'v*'
+      - 'fw-v*'
+      - 'firmware-v*'
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
@@ -29,17 +37,17 @@ jobs:
       CHIP_PLATFORM: "ESP32C3"
       # Arduino CLI 编译 FQBN (使用 default 双分区支持 OTA 与回滚)
       FQBN: "esp32:esp32:esp32c3:CDCOnBoot=cdc,FlashMode=dio,FlashSize=4M,PartitionScheme=default"
-      # Arduino .ino 主文件路径
-      SKETCH_PATH: "./firmware/firmware.ino"
+      # Arduino .ino 主文件路径 (位于 firmware/anycontrol 独立目录)
+      SKETCH_PATH: "./firmware/anycontrol/anycontrol.ino"
       # 编译生成的主程序固件二进制文件名
-      SKETCH_NAME: "firmware.ino"
+      SKETCH_NAME: "anycontrol.ino"
       # esptool merge_bin 参数
       FLASH_CHIP: "esp32c3"
       FLASH_MODE: "dio"
       FLASH_SIZE: "4MB"
       FLASH_FREQ: "40m"
-      # CHANGELOG 文件路径
-      CHANGELOG_PATH: "CHANGELOG.md"
+      # 固件专属 CHANGELOG 文件路径
+      CHANGELOG_PATH: "firmware/CHANGELOG.md"
 
     steps:
       - name: Checkout Code
@@ -47,16 +55,24 @@ jobs:
         with:
           fetch-depth: 0
 
-      # 1. 从 Tag 提取版本号
-      - name: Extract Version from Tag
+      # 1. 动态解析固件版本号 (优先从固件 Tag 提取，其次从 firmware/version.json 提取)
+      - name: Extract Version
         id: get_version
         run: |
-          VERSION="${GITHUB_REF#refs/tags/}"
-          if [[ ! "$VERSION" =~ ^v ]]; then
-            VERSION="v$VERSION"
+          if [[ "${GITHUB_REF}" =~ ^refs/tags/(fw-v?|firmware-v?|v?)(.+) ]]; then
+            RAW_VER="${BASH_REMATCH[2]}"
+            VERSION="v${RAW_VER#v}"
+          elif [ -f "firmware/version.json" ]; then
+            RAW_VER=$(jq -r '.version' firmware/version.json)
+            VERSION="v${RAW_VER#v}"
+          elif [ -f "firmware/anycontrol/Globals.h" ]; then
+            RAW_VER=$(grep '#define FIRMWARE_VERSION' firmware/anycontrol/Globals.h | awk -F'"' '{print $2}')
+            VERSION="v${RAW_VER#v}"
+          else
+            VERSION="v1.0.0"
           fi
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          echo "Detected firmware version from tag: $VERSION"
+          echo "Detected firmware version: $VERSION"
 
       # 2. 安装 arduino-cli
       - name: Setup Arduino CLI

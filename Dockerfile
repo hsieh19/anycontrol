@@ -18,18 +18,24 @@ COPY client/ ./
 RUN npm run build
 
 # ---------------------------------------------------
-# Stage 2: 构建后端 TypeScript 代码 (Server Build)
+# Stage 2: 构建后端 TypeScript 代码及原生 SQLite 模块 (Server Build)
 # ---------------------------------------------------
 FROM node:20-alpine AS server-builder
 WORKDIR /app/server
 
-# 安装依赖
+# 安装 node-gyp 原生 C++ 编译工具链 (供 better-sqlite3 编译)
+RUN apk add --no-cache python3 make g++
+
+# 安装所有依赖并自动编译原生 C++ 模块
 COPY server/package*.json ./
 RUN npm ci
 
 # 复制源码并编译 TypeScript -> JavaScript
 COPY server/ ./
 RUN npm run build
+
+# 清理 devDependencies 保留生产所需 node_modules (包含已编译好的 .node 模块)
+RUN npm prune --production
 
 # ---------------------------------------------------
 # Stage 3: 生产运行时镜像 (Production Runtime)
@@ -45,16 +51,14 @@ RUN apk add --no-cache tzdata \
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# 仅安装后端生产运行依赖
 WORKDIR /app/server
-COPY server/package*.json ./
-RUN npm ci --only=production
 
-# 复制编译后的后端产物
+# 复制生产依赖 (包含 Alpine 环境下编译完成的 better-sqlite3 原生模块)
+COPY --from=server-builder /app/server/node_modules ./node_modules
 COPY --from=server-builder /app/server/dist ./dist
+COPY --from=server-builder /app/server/package.json ./package.json
 
-# I7 修复：不将 data 目录打包进镜像，由 docker-compose volume 挂载提供
-# 确保镜像中 data 目录存在（首次启动 Volume 为空时 db.ts 会自动初始化）
+# 确保 SQLite 数据库挂载目录存在
 RUN mkdir -p /app/server/data
 
 # 复制前端编译产物 (供后端静态托管)

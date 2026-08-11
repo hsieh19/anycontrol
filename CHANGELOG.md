@@ -1,23 +1,31 @@
-# Changelog
+# 软件平台更新日志 (Software Platform Changelog)
 
-本项目的版本记录严格遵循 [Semantic Versioning (语义化版本 2.0.0)](https://semver.org/lang/zh-CN/) 规范。
+本文件专门记录 **AnyControl 工业控制与审计软件平台**（包含 Vue 3 前端界面、Node.js/TS 核心服务与 SQLite 数据库）的版本变更记录，遵循 [Semantic Versioning (语义化版本 2.0.0)](https://semver.org/lang/zh-CN/) 规范。
+
+*(注：ESP32-C3 嵌入式固件的变更日志请参阅 [firmware/CHANGELOG.md](firmware/CHANGELOG.md))*
 
 ---
 
 ## [v1.0.0] - 2026-08-11
 
-### ✨ 新增功能 (Added)
-- **ESP32-C3 双路 RS485 防碰撞中继**：
-  - `UART0 (GPIO20/21)` 对接原物理主站/触摸屏；
-  - `UART1 (GPIO2/10)` 对接现场 RS485 从站总线；
-  - `WiFi TCP (Port 9502)` 作为上位机主站 2 并发接入，实现硬件级时间切片防碰撞转发。
-- **全套网络模式与静态 IP 支持**：
-  - 支持现场 WiFi STA 自动重连与静态 IP (IP/Mask/Gateway/DNS) 绑定；
-  - WiFi 异常断开时自愈回退到 `AnyControl_AP` 热点配网模式。
-- **内置 Web 管理控制台 (Port 80)**：
-  - 提供 CPU 频率、内存占用、Flash 占用、WiFi 信号强度、芯片结温与运行时间 6 大核心监控指标；
-  - 支持热重载串口波特率、数据位、校验位、停止位及心跳周期；
-  - 输入框实时回显当前生效的网络参数。
-- **AnyFlash OTA 在线升级与安全双分区回滚**：
-  - 对接 AnyFlash Serverless 分发网关（带 HMAC 签名与 10 分钟时效防护）；
-  - 支持 ESP32 A/B 双分区无缝升级与一键回滚上一个版本。
+### ✨ 核心功能 (Added)
+- **工业控制台与受控设备管理**：
+  - 响应式树状设备拓扑视图（网关/从站设备/点位）；
+  - 支持线圈（FC05）与保持寄存器（FC06/FC16）交互控制；
+  - 闭环物理回读校验机制（带容差与执行耗时毫秒级计量）。
+- **32位跨寄存器与字节序编解码**：
+  - 原生支持 `UINT32`、`INT32`、`FLOAT32` 高低字组包；
+  - 支持 `ABCD`、`CDAB`、`BADC`、`DCBA` 四种 Modbus 字节序转换。
+- **全量操作审计与 WebSocket 广播**：
+  - 自动记录操作员、变更前原始值、下发设定值、物理回读值及网关 IP；
+  - WebSocket (`/ws`) 实时推送操作日志流。
+- **企业级安全鉴权与 SSO**：
+  - 全量 API 受 JWT（8小时时效）保护，密码使用 `bcrypt` 哈希加密；
+  - 支持企业自建飞书应用 OAuth2 扫码登录与免登绑定；
+  - 角色权限隔离（`ADMIN`, `OPERATOR`, `AUDITOR`, `VIEWER`）。
+- **SQLite (WAL 模式) 高性能存储引擎**：
+  - 单文件便携数据库，彻底替代 JSON 文件读写，高频控制零锁死；
+  - 历史数据自动平滑迁移与一键全量 JSON 备份/灾难恢复。
+- **Docker 生产级部署**：
+  - Alpine Linux 多阶段构建镜像，原生 SQLite 模块自动编译；
+  - 配置直接在 `docker-compose.yml` 中直观管理。
