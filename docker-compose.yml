@@ -2,22 +2,19 @@
 # AnyControl 工业设备控制与审计平台 - Docker Compose 生产部署编排配置
 # 
 # 常用运维命令：
-#   1. 启动服务 (后台运行并重新构建):  docker compose up -d --build
-#   2. 查看实时运行日志:              docker compose logs -f anycontrol-app
-#   3. 查看容器运行状态:              docker compose ps
-#   4. 停止并移除容器:                docker compose down
-#   5. 重启服务:                      docker compose restart anycontrol-app
+#   1. 拉取最新镜像并启动:          docker compose pull && docker compose up -d
+#   2. 查看实时运行日志:            docker compose logs -f
+#   3. 查看容器运行状态:            docker compose ps
+#   4. 停止并移除容器:              docker compose down
+#   5. 重启服务:                    docker compose restart
 # ==============================================================================
 
 services:
   anycontrol-app:
     # --------------------------------------------------------------------------
-    # 1. 镜像构建配置
+    # 1. 镜像配置 (直接从 GitHub Packages 容器注册表拉取)
     # --------------------------------------------------------------------------
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: anycontrol:latest
+    image: ghcr.io/hsieh19/anycontrol:latest
     container_name: anycontrol-industrial
     
     # 容器崩溃或宿主机重启后自动拉起 (生产环境推荐 unless-stopped 或 always)

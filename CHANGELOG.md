@@ -6,6 +6,24 @@
 
 ---
 
+## [v1.0.1] - 2026-08-11
+
+### 🐛 缺陷修复 (Fixed)
+- **修复 Docker 生产容器段错误崩溃 (SIGSEGV Exit 139)**：
+  - 生产构建与运行基础镜像全面迁移至官方标准 `node:20-bookworm-slim`（基于 Debian glibc）；
+  - 彻底解决 `better-sqlite3` 原生 C++ 扩展在 Alpine Linux (musl 1.2.5) 下触发的 ABI 二进制不兼容与内存段错误问题。
+- **优化环境变量日志输出**：
+  - 优化 `dotenv` 在无 `.env` 配置文件环境下的静默处理，去除启动时的多行无意义提示。
+- **增强后端异常监控**：
+  - 注册 `uncaughtException` 与 `unhandledRejection` 全局监听，防止 Node.js 底层异常静默退出。
+
+### ⚡ 部署与运维优化 (Changed)
+- **优化 `docker-compose.yml` 编排文件**：
+  - 移除本地 `build:` 构建段，生产环境直接通过 GitHub Packages (GHCR) 拉取最新多架构镜像部署；
+  - 更新常用运维命令说明。
+
+---
+
 ## [v1.0.0] - 2026-08-11
 
 ### ✨ 核心功能 (Added)

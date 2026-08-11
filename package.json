@@ -1,6 +1,6 @@
 {
   "name": "anycontrol-industrial-web",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Industrial Web Control and Audit System",
   "scripts": {
     "server:dev": "npm --prefix server run dev",
