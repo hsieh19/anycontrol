@@ -1,4 +1,4 @@
-﻿# ⚡ AnyControl (工业智能网关与控制审计平台)
+# ⚡ AnyControl (工业智能网关与控制审计平台)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node: >=20](https://img.shields.io/badge/Node->=20-green.svg)](https://nodejs.org/)
@@ -93,22 +93,7 @@ cd ../client
 npm install
 ```
 
-### 3. 配置环境变量
-
-复制并编辑 `server/.env`：
-
-```env
-PORT=3000
-# 生产环境请务必生成并配置强随机密钥 (至少32位)
-JWT_SECRET=your-strong-random-secret-key
-
-# 飞书自建应用配置 (可选)
-FEISHU_APP_ID=
-FEISHU_APP_SECRET=
-FEISHU_REDIRECT_URI=http://127.0.0.1:5173/
-```
-
-### 4. 本地启动开发环境
+### 3. 本地启动开发环境
 
 ```bash
 # 启动后端服务 (终端 1)
@@ -124,16 +109,17 @@ npm run dev
 
 ---
 
-## 🐳 Docker 生产部署
+## 🐳 Docker 生产部署 (推荐)
 
-项目支持一键通过 Docker Compose 部署：
+项目所有生产参数均直接在 `docker-compose.yml` 中内嵌定义与注释，无需额外维护 `.env` 文件。
 
 ```bash
-# 构建并启动服务
+# 1. 根据实际环境按需编辑 docker-compose.yml 中的参数 (如 JWT_SECRET、飞书配置等)
+# 2. 一键构建并启动服务
 docker compose up -d --build
 ```
 
-- 静态资源与 API 服务统一由 `3000` 端口对外暴露。
+- 静态资源与 API 服务统一由 `3000` 端口对外暴露（可在 `docker-compose.yml` 中直接修改映射端口）。
 - 数据库与运行期数据通过 Docker Volume `anycontrol-data` 挂载到 `/app/server/data`，重启与升级数据不丢失。
 
 ---

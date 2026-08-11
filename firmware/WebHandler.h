@@ -25,7 +25,11 @@ static const char PAGE_CSS[] PROGMEM =
     "button:hover{background:#1d4ed8} "
     ".save-btn{display:block;width:100%;padding:12px;font-size:16px;margin-top:15px;background:#16a34a} "
     ".save-btn:hover{background:#15803d} "
-    ".badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:12px;background:#dbeafe;color:#1e40af;font-weight:600}";
+    ".badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:12px;background:#dbeafe;color:#1e40af;font-weight:600} "
+    ".ota-box{margin-bottom:16px} "
+    ".ota-label{display:block;font-size:14px;color:#475569;font-weight:500;margin-bottom:8px} "
+    ".ota-input{width:100%;box-sizing:border-box;padding:10px 14px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;font-family:Consolas,Monaco,'Courier New',monospace;background:#fff;color:#0f172a;transition:border-color 0.2s} "
+    ".ota-input:focus{border-color:#2563eb;outline:none;box-shadow:0 0 0 3px rgba(37,99,235,0.15)}";
 
 static void handleHttpRoot() {
   String html;
@@ -122,7 +126,8 @@ static void handleHttpRoot() {
 
   // 3. OTA 固件更新与回滚卡片
   html += "<div class='card' style='margin-top:20px'><h2>系统固件在线更新 (OTA)</h2>";
-  html += "<div><label>OTA 服务端地址:</label><input id='otaApi' name='otaApi' value='" + g_otaApiBase + "' style='max-width:100%'></div>";
+  html += "<div class='ota-box'><label class='ota-label' for='otaApi'>OTA 服务端地址 (URL):</label>";
+  html += "<input id='otaApi' class='ota-input' name='otaApi' value='" + g_otaApiBase + "' placeholder='https://your-firmware-worker.workers.dev'></div>";
   html += "<div id='otaInfo' style='margin:15px 0'><div style='padding:12px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;font-size:13px;color:#64748b'>点击下方按钮检查云端是否有新版本...</div></div>";
   html += "<div style='display:flex;gap:10px'>";
   html += "<button type='button' onclick='uiCheckOta()'>🔍 检查更新</button>";
@@ -162,8 +167,10 @@ static void handleHttpRoot() {
   html += "setInterval(refreshSysStats, 3000); refreshSysStats();";
 
   html += "async function uiCheckOta(){ let s=document.getElementById('otaInfo'); ";
+  html += "let urlInp=document.getElementById('otaApi'); let otaUrl=urlInp?urlInp.value.trim():''; ";
   html += "s.innerHTML=\"<div style='padding:12px;background:#e2e8f0;border-radius:6px;font-size:13px;color:#334155'>⏳ 正在连接云端校验更新，请稍候...</div>\"; ";
-  html += "try{ let r=await fetch('/api/ota/check'); let data=await r.json(); ";
+  html += "try{ let reqUrl='/api/ota/check' + (otaUrl ? ('?url=' + encodeURIComponent(otaUrl)) : ''); ";
+  html += "let r=await fetch(reqUrl); let data=await r.json(); ";
   html += "if(data.found){ ";
   html += "s.innerHTML=`<div style='background:#dcfce7;border-left:4px solid #16a34a;padding:12px;border-radius:6px;color:#14532d;font-size:13px'><b style='font-size:15px;color:#15803d;display:block;margin-bottom:6px'>🎉 发现新版本: v${data.version}</b><div style='white-space:pre-wrap;background:#fff;padding:10px;border-radius:4px;border:1px solid #bbf7d0'>${data.changelog}</div></div>`; ";
   html += "document.getElementById('btnDoUpdate').style.display='inline-block'; ";
@@ -372,6 +379,17 @@ static void handleHttpConfig() {
 }
 
 static void handleOtaCheck() {
+  if (g_httpServer.hasArg("url")) {
+    String url = g_httpServer.arg("url");
+    url.trim();
+    if (url.length() > 0) {
+      g_otaApiBase = url;
+      if (g_prefs.begin("anycontrol", false)) {
+        g_prefs.putString("otaApi", g_otaApiBase);
+        g_prefs.end();
+      }
+    }
+  }
   int result = checkOtaUpdate();
   DynamicJsonDocument doc(512);
   doc["found"] = (result == 1);

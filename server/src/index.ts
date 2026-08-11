@@ -1,8 +1,17 @@
-import dotenv from 'dotenv';
-dotenv.config();
-
 import path from 'path';
 import fs from 'fs';
+import dotenv from 'dotenv';
+
+// 优先加载项目根目录 .env，兼容本地 server 目录与 Docker 运行环境
+const rootEnvPath = path.resolve(__dirname, '../../.env');
+const localEnvPath = path.resolve(__dirname, '../.env');
+if (fs.existsSync(rootEnvPath)) {
+  dotenv.config({ path: rootEnvPath });
+} else if (fs.existsSync(localEnvPath)) {
+  dotenv.config({ path: localEnvPath });
+} else {
+  dotenv.config();
+}
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
