@@ -1,0 +1,78 @@
+name: Build and Publish Docker Image to GHCR
+
+# 触发条件：
+# 1. 当推送 v* 版本标签时触发 (与固件发布协同)
+# 2. 当主分支上 package.json 发生版本迭代提交时触发
+# 3. 支持 GitHub 页面手动一键触发 (workflow_dispatch)
+on:
+  push:
+    branches: [ "main", "master" ]
+    paths:
+      - 'package.json'
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    name: 构建 Docker 镜像并推送至 GitHub Packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 1. 动态解析提取版本号 (优先从 Tag 提取，其次从根目录 package.json 提取)
+      - name: Extract Version
+        id: get_version
+        run: |
+          if [[ "${GITHUB_REF}" =~ ^refs/tags/v?([0-9]+\.[0-9]+\.[0-9]+.*) ]]; then
+            VERSION="${BASH_REMATCH[1]}"
+          else
+            VERSION=$(jq -r '.version' package.json)
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Detected Docker image version: $VERSION"
+
+      # 2. 登录到 GitHub Packages 容器注册表 (GHCR)
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 3. 设置 QEMU 模拟器与 Docker Buildx 多架构构建套件 (支持 AMD64 与 ARM64/树莓派/工控机)
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 4. 将 GitHub 镜像路径规范转换为全小写字符
+      - name: Downcase image name
+        id: string
+        run: |
+          echo "IMAGE_NAME_LOWER=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      # 5. 构建并 Push 工业级多平台镜像 (linux/amd64, linux/arm64)
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ steps.string.outputs.IMAGE_NAME_LOWER }}:latest
+            ${{ steps.string.outputs.IMAGE_NAME_LOWER }}:${{ steps.get_version.outputs.VERSION }}
+            ${{ steps.string.outputs.IMAGE_NAME_LOWER }}:v${{ steps.get_version.outputs.VERSION }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
