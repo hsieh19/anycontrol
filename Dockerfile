@@ -6,7 +6,7 @@
 # ---------------------------------------------------
 # Stage 1: 构建前端静态资源 (Client Build)
 # ---------------------------------------------------
-FROM node:20-bookworm-slim AS client-builder
+FROM node:22-bookworm-slim AS client-builder
 WORKDIR /app/client
 
 # 安装依赖
@@ -20,27 +20,27 @@ RUN npm run build
 # ---------------------------------------------------
 # Stage 2: 构建后端 TypeScript 代码及原生 SQLite 模块 (Server Build)
 # ---------------------------------------------------
-FROM node:20-bookworm-slim AS server-builder
+FROM node:22-bookworm-slim AS server-builder
 WORKDIR /app/server
 
-# 安装 node-gyp 原生 C++ 编译工具链 (供 better-sqlite3 编译)
+# 安装 node-gyp 原生 C++ 编译工具链 (供 better-sqlite3 源码编译)
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# 安装依赖并强制针对当前环境从源码编译原生 C++ 模块，彻底消除预编译包段错误
+# 安装依赖并强制从源码编译原生模块
 COPY server/package*.json ./
 RUN npm ci && npm rebuild better-sqlite3 --build-from-source
 
 COPY server/ ./
 RUN npm run build
 
-# 清理 devDependencies 保留生产所需 node_modules (包含预编译好且完美兼容的 glibc 原生模块)
+# 清理 devDependencies 保留生产所需 node_modules
 RUN npm prune --production
 
 # ---------------------------------------------------
 # Stage 3: 生产运行时镜像 (Production Runtime)
 # ---------------------------------------------------
-FROM node:20-bookworm-slim AS runner
+FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 
 # 设置时区为亚洲/上海 (工业环境标准)
