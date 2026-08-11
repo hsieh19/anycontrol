@@ -27,9 +27,9 @@ WORKDIR /app/server
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# 安装所有依赖并编译 TypeScript -> JavaScript
+# 安装依赖并强制针对当前环境从源码编译原生 C++ 模块，彻底消除预编译包段错误
 COPY server/package*.json ./
-RUN npm ci
+RUN npm ci && npm rebuild better-sqlite3 --build-from-source
 
 COPY server/ ./
 RUN npm run build
