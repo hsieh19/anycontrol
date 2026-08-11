@@ -72,7 +72,20 @@ export const deleteGateway = async (id: string) => {
 };
 
 export const testGatewayConnection = async (id: string) => {
-  const res = await api.post<{ success: boolean; data: { online: boolean; message: string; latencyMs?: number } }>(`/gateways/${id}/test`);
+  const res = await api.post<{
+    success: boolean;
+    data: {
+      online: boolean;
+      message: string;
+      latencyMs?: number;
+      telemetry?: {
+        latencyMs?: number;
+        wifiRssi?: number;
+        ramUsage?: number;
+        chipTemp?: number;
+      };
+    }
+  }>(`/gateways/${id}/test`);
   return res.data.data;
 };
 

@@ -2,9 +2,9 @@
 # AnyControl 固件自动编译与发布到 AnyFlash R2 工作流
 # ============================================================
 # 触发条件：
-# 1. 推送固件专属版本标签 (如 git tag fw-v1.0.0 && git push origin fw-v1.0.0)
-# 2. 当主分支上 firmware/ 固件目录发生代码或版本变更时触发
-# 3. 支持 GitHub 页面手动一键触发 (workflow_dispatch)
+# 1. 当 firmware/version.json 版本文件发生变更时自动触发 (推荐方式)
+#    修改 firmware/version.json 中的 version 字段，提交即触发
+# 2. 支持 GitHub 页面手动一键触发 (workflow_dispatch)
 # ============================================================
 
 name: Build & Publish Firmware to AnyFlash R2
@@ -13,10 +13,7 @@ on:
   push:
     branches: [ "main", "master" ]
     paths:
-      - 'firmware/**'
-    tags:
-      - 'fw-v*'
-      - 'firmware-v*'
+      - 'firmware/version.json'
   workflow_dispatch:
 
 jobs:

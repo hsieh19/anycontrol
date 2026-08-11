@@ -1,20 +1,14 @@
 name: Build and Publish Docker Image to GHCR
 
 # 触发条件：
-# 1. 当推送软件专属版本标签 (如 git tag app-v1.0.0 或 git tag v1.0.0)
-# 2. 当主分支上软件核心代码 (client/**, server/**, Dockerfile, package.json) 发生变更
-# 3. 支持 GitHub 页面手动一键触发 (workflow_dispatch)
+# 1. 当 package.json 软件版本号发生变更时自动触发 (推荐方式)
+#    修改 package.json 中的 version 字段，提交即触发
+# 2. 支持 GitHub 页面手动一键触发 (workflow_dispatch)
 on:
   push:
     branches: [ "main", "master" ]
     paths:
       - 'package.json'
-      - 'Dockerfile'
-      - 'client/**'
-      - 'server/**'
-    tags:
-      - 'app-v*'
-      - 'v[0-9]*'
   workflow_dispatch:
 
 env:
