@@ -31,6 +31,16 @@ logs/
 .DS_Store
 Thumbs.db
 
+# 本地持久化数据与 SQLite 数据库 (生产数据通过 Docker Volume 挂载)
+server/data/*.json
+server/data/*.db
+server/data/*.db-wal
+server/data/*.db-shm
+*.db
+*.db-wal
+*.db-shm
+data/
+
 # 嵌入式固件编译产物 (如有临时构建)
 firmware/build/
 *.bin
