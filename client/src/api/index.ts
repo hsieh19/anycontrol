@@ -95,7 +95,29 @@ export const pushConfigToGateway = async (id: string) => {
 };
 
 export const pullConfigFromGateway = async (id: string) => {
-  const res = await api.post<{ success: boolean; data: { success: boolean; message: string; syncedAt: string; deviceReport: any } }>(`/gateways/${id}/pull-config`);
+  const res = await api.post<{ success: boolean; data: { success: boolean; isOnline?: boolean; message: string; syncedAt: string; deviceReport: any } }>(`/gateways/${id}/pull-config`);
+  return res.data.data;
+};
+
+export const probeGatewaySlaves = async (gatewayId: string) => {
+  const res = await api.post<{
+    success: boolean;
+    data: {
+      gatewayId: string;
+      total: number;
+      onlineCount: number;
+      offlineCount: number;
+      results: Array<{ deviceId: string; slaveId: number; name: string; status: 'ONLINE' | 'OFFLINE'; message: string }>;
+    };
+  }>(`/gateways/${gatewayId}/probe-slaves`);
+  return res.data.data;
+};
+
+export const probeDevice = async (deviceId: string) => {
+  const res = await api.post<{
+    success: boolean;
+    data: { success: boolean; status: 'ONLINE' | 'OFFLINE'; latencyMs?: number; message: string };
+  }>(`/devices/${deviceId}/probe`);
   return res.data.data;
 };
 

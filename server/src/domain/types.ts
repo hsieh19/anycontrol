@@ -29,7 +29,7 @@ export interface ControlledDevice {
   slaveId: number; // Modbus总线地址 (1~247)
   protocolTemplateId: string; // 关联的控制协议模板
   description?: string;
-  status: 'ONLINE' | 'OFFLINE' | 'BUSY';
+  status: 'ONLINE' | 'OFFLINE' | 'BUSY' | 'UNKNOWN';
   createdAt: string;
   updatedAt: string;
 }

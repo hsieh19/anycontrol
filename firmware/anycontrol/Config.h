@@ -18,7 +18,7 @@ uint32_t g_master1FrameCount = 0;
 uint32_t g_master2FrameCount = 0;
 uint32_t g_busCrcErrorCount = 0;
 String g_otaApiBase = "https://your-firmware-worker.workers.dev";
-DualMasterConfig g_dualMasterConfig = {9600, 8, 0, 1, 9502};
+DualMasterConfig g_dualMasterConfig = {9600, 8, 0, 1, 9502, 1000};
 
 WebServer g_httpServer(80);
 volatile bool g_needRestart = false;
@@ -61,6 +61,7 @@ static void loadPersistentConfig() {
     g_dualMasterConfig.masterParity = g_prefs.getUChar("dmParity", 0);
     g_dualMasterConfig.masterStop   = g_prefs.getUChar("dmStop", 1);
     g_dualMasterConfig.wifiPort     = g_prefs.getUShort("dmWPort", 9502);
+    g_dualMasterConfig.masterTimeout = g_prefs.getUShort("dmTimeout", 1000);
 
     g_prefs.end();
 }

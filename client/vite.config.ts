@@ -4,7 +4,7 @@ import path from 'path'
 import fs from 'fs'
 
 // 动态读取项目版本号 (优先根目录 package.json，其次当前 client/package.json)
-let appVersion = '1.0.1'
+let appVersion = '1.0.2'
 try {
   const rootPkgPath = path.resolve(__dirname, '../package.json')
   if (fs.existsSync(rootPkgPath)) {

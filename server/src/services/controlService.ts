@@ -1,7 +1,7 @@
 import { db } from '../infrastructure/db';
 import { modbusClientManager } from '../infrastructure/modbusClient';
 import { wsManager } from '../infrastructure/wsServer';
-import { ControlCommandRequest, AuditLog } from '../domain/types';
+import { ControlCommandRequest, AuditLog, ControlPoint } from '../domain/types';
 
 export class ControlService {
   /**
@@ -134,6 +134,19 @@ export class ControlService {
     }
 
     const results: Record<string, any> = {};
+
+    // 若所属网关已离线，直接返回离线状态，避免串行排队超时阻塞
+    if (gateway.status === 'OFFLINE') {
+      for (const point of template.points) {
+        results[point.key] = {
+          success: false,
+          value: null,
+          error: '所属网关当前处于离线状态'
+        };
+      }
+      return results;
+    }
+
     const port = gateway.port || 9502;
     const timeout = gateway.timeout || 2000;
 
@@ -162,6 +175,129 @@ export class ControlService {
     }
 
     return results;
+  }
+
+  /**
+   * 探测单个受控从站设备的物理总线连通性
+   */
+  public async probeDevice(deviceId: string): Promise<{ success: boolean; status: 'ONLINE' | 'OFFLINE'; latencyMs?: number; message: string }> {
+    const device = db.getDeviceById(deviceId);
+    if (!device) {
+      throw new Error(`受控设备 [${deviceId}] 不存在`);
+    }
+
+    const gateway = db.getGatewayById(device.gatewayId);
+    if (!gateway) {
+      throw new Error(`设备所属网关 [${device.gatewayId}] 不存在`);
+    }
+
+    if (gateway.status === 'OFFLINE') {
+      device.status = 'OFFLINE';
+      db.saveDevice(device);
+      return {
+        success: false,
+        status: 'OFFLINE',
+        message: `所属网关 [${gateway.name}] 当前处于离线状态`
+      };
+    }
+
+    const template = db.getControlTemplateById(device.protocolTemplateId);
+    // 取模板中的第 1 个点位，若无点位则构造默认 FC03 寄存器 0x0000 探活点
+    const probePoint: ControlPoint = (template && template.points.length > 0)
+      ? template.points[0]
+      : {
+          id: 'probe',
+          name: '探活点',
+          key: 'probe',
+          functionCode: 3,
+          address: 0,
+          dataType: 'UINT16',
+          registerCount: 1,
+          permission: 'RO'
+        };
+
+    const port = gateway.port || 9502;
+    const startTime = Date.now();
+    try {
+      const readRes = await modbusClientManager.executeSafeRead(
+        gateway.id,
+        gateway.ip,
+        port,
+        device.slaveId,
+        probePoint,
+        1200 // 探活单次超时 1.2 秒
+      );
+      const latencyMs = Date.now() - startTime;
+
+      if (readRes.success) {
+        device.status = 'ONLINE';
+        db.saveDevice(device);
+        return {
+          success: true,
+          status: 'ONLINE',
+          latencyMs,
+          message: `从站 #${device.slaveId} (${device.name}) 总线应答正常 (${latencyMs}ms)`
+        };
+      } else {
+        device.status = 'OFFLINE';
+        db.saveDevice(device);
+        return {
+          success: false,
+          status: 'OFFLINE',
+          message: `从站 #${device.slaveId} (${device.name}) 未响应: ${readRes.error || '超时'}`
+        };
+      }
+    } catch (e: any) {
+      device.status = 'OFFLINE';
+      db.saveDevice(device);
+      return {
+        success: false,
+        status: 'OFFLINE',
+        message: `从站 #${device.slaveId} 探活异常: ${e.message}`
+      };
+    }
+  }
+
+  /**
+   * 批量探测指定网关下挂的所有受控从站设备
+   */
+  public async probeGatewaySlaves(gatewayId: string): Promise<{
+    gatewayId: string;
+    total: number;
+    onlineCount: number;
+    offlineCount: number;
+    results: Array<{ deviceId: string; slaveId: number; name: string; status: 'ONLINE' | 'OFFLINE'; message: string }>;
+  }> {
+    const allDevices = db.getDevices();
+    const gwDevices = allDevices.filter(d => d.gatewayId === gatewayId);
+
+    const results: Array<{ deviceId: string; slaveId: number; name: string; status: 'ONLINE' | 'OFFLINE'; message: string }> = [];
+    let onlineCount = 0;
+    let offlineCount = 0;
+
+    for (const dev of gwDevices) {
+      const probeRes = await this.probeDevice(dev.id);
+      if (probeRes.status === 'ONLINE') {
+        onlineCount++;
+      } else {
+        offlineCount++;
+      }
+      results.push({
+        deviceId: dev.id,
+        slaveId: dev.slaveId,
+        name: dev.name,
+        status: probeRes.status,
+        message: probeRes.message
+      });
+    }
+
+    return {
+      gatewayId,
+      total: gwDevices.length,
+      onlineCount,
+      offlineCount,
+      results
+    };
   }
 }
 

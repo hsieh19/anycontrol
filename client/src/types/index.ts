@@ -29,7 +29,7 @@ export interface ControlledDevice {
   slaveId: number;
   protocolTemplateId: string;
   description?: string;
-  status: 'ONLINE' | 'OFFLINE' | 'BUSY';
+  status: 'ONLINE' | 'OFFLINE' | 'BUSY' | 'UNKNOWN';
   templateName?: string;
   pointsCount?: number;
   createdAt?: string;

@@ -44,8 +44,8 @@
             </div>
             <div class="node-right">
               <span class="status-dot" :class="gw.status === 'ONLINE' ? 'online' : 'offline'"></span>
-              <span class="node-latency font-mono" :class="gw.status === 'ONLINE' ? 'text-emerald' : 'text-muted'" :title="`网络通信延迟: ${gw.latencyMs || 15}ms`">
-                {{ gw.latencyMs !== undefined ? gw.latencyMs + 'ms' : (gw.status === 'ONLINE' ? '15ms' : '--') }}
+              <span class="node-latency font-mono" :class="gw.status === 'ONLINE' ? 'text-emerald' : 'text-muted'" :title="gw.status === 'ONLINE' ? `网络通信延迟: ${gw.latencyMs ?? 15}ms` : '网关当前已离线'">
+                {{ gw.status === 'ONLINE' && gw.latencyMs !== undefined ? gw.latencyMs + 'ms' : (gw.status === 'ONLINE' ? '15ms' : '--') }}
               </span>
             </div>
           </div>
@@ -72,8 +72,17 @@
                   <span v-if="!isDeviceAccessible(dev.id)" class="no-perm-tag">无操作权限</span>
                 </div>
               </div>
-              <div class="dev-status">
-                <span class="status-indicator" :class="dev.status.toLowerCase()"></span>
+              <div class="dev-status-wrap" :title="gw.status !== 'ONLINE' ? '上级网关已离线' : (dev.status === 'ONLINE' ? '从站通信正常在线' : (dev.status === 'OFFLINE' ? '从站总线无响应' : '从站待探测'))">
+                <span 
+                  class="slave-status-dot" 
+                  :class="gw.status !== 'ONLINE' ? 'offline' : (dev.status === 'ONLINE' ? 'online' : (dev.status === 'OFFLINE' ? 'offline' : (dev.status === 'BUSY' ? 'busy' : 'unknown')))"
+                ></span>
+                <span 
+                  class="slave-status-tag font-mono"
+                  :class="gw.status !== 'ONLINE' ? 'is-gw-offline' : (dev.status === 'ONLINE' ? 'is-online' : (dev.status === 'OFFLINE' ? 'is-offline' : (dev.status === 'BUSY' ? 'is-busy' : 'is-unknown')))"
+                >
+                  {{ gw.status !== 'ONLINE' ? '离线' : (dev.status === 'ONLINE' ? '在线' : (dev.status === 'OFFLINE' ? '离线' : (dev.status === 'BUSY' ? '忙' : '待测')) ) }}
+                </span>
               </div>
             </div>
             <div v-if="gw.children.length === 0" class="empty-child">
@@ -97,6 +106,18 @@
             <div class="title-with-badge">
               <h2>{{ selectedDev.name }}</h2>
               <span class="badge-accent">Slave ID: {{ selectedDev.slaveId }}</span>
+              <div class="slave-hero-status-badge">
+                <span 
+                  class="slave-status-dot" 
+                  :class="selectedDev.gateway.status !== 'ONLINE' ? 'offline' : (selectedDev.status === 'ONLINE' ? 'online' : (selectedDev.status === 'OFFLINE' ? 'offline' : (selectedDev.status === 'BUSY' ? 'busy' : 'unknown')))"
+                ></span>
+                <span 
+                  class="slave-hero-status-text font-mono"
+                  :class="selectedDev.gateway.status !== 'ONLINE' ? 'is-gw-offline' : (selectedDev.status === 'ONLINE' ? 'is-online' : (selectedDev.status === 'OFFLINE' ? 'is-offline' : (selectedDev.status === 'BUSY' ? 'is-busy' : 'is-unknown')))"
+                >
+                  {{ selectedDev.gateway.status !== 'ONLINE' ? '网关离线' : (selectedDev.status === 'ONLINE' ? '正常在线' : (selectedDev.status === 'OFFLINE' ? '总线离线' : (selectedDev.status === 'BUSY' ? '通讯中' : '待检测')) ) }}
+                </span>
+              </div>
               <span class="badge-gw">所属网关: {{ selectedDev.gateway.name }} ({{ selectedDev.gateway.ip }}:{{ currentCommPort }})</span>
             </div>
             <p class="dev-desc">{{ selectedDev.description || '标准工业控制从站设备，支持在线闭环控制与状态回读' }}</p>
@@ -109,7 +130,7 @@
               circle
               size="default"
               :loading="refreshingPoints"
-              @click="refreshCurrentPoints"
+              @click="refreshCurrentPoints(true)"
               title="刷新当前从站物理寄存器状态"
             >
               <svg class="icon-btn" style="margin: 0; width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -436,12 +457,26 @@ const initPointInputValues = () => {
   }
 };
 
-const refreshCurrentPoints = async () => {
+const refreshCurrentPoints = async (manual = false) => {
   if (!selectedDev.value) return;
+
+  // 若所属网关离线，直接置空点位状态，避免无谓超时请求
+  if (selectedDev.value.gateway.status !== 'ONLINE') {
+    livePointStatus.value = {};
+    if (manual) {
+      ElMessage.warning({
+        message: '当前设备所属网关处于离线状态，无法同步现场寄存器',
+        grouping: true,
+        duration: 2500
+      });
+    }
+    return;
+  }
+
   refreshingPoints.value = true;
   try {
     const res = await api.fetchDevicePointsStatus(selectedDev.value.id);
-    if (res.success) {
+    if (res.success && res.data) {
       livePointStatus.value = res.data;
       // Sync numerical inputs if available
       for (const [k, v] of Object.entries(res.data)) {
@@ -451,7 +486,15 @@ const refreshCurrentPoints = async () => {
       }
     }
   } catch (e: any) {
-    ElMessage.warning(`读取设备实时值提示: ${e.message}`);
+    if (manual) {
+      ElMessage.warning({
+        message: `从站寄存器同步提示: ${e.message}`,
+        grouping: true,
+        duration: 2500
+      });
+    } else {
+      console.warn(`静默读取点位失败:`, e.message);
+    }
   } finally {
     refreshingPoints.value = false;
   }
@@ -814,12 +857,84 @@ onMounted(() => {
   border-radius: 2px;
 }
 
-.status-indicator {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent-green);
+.dev-status-wrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
 }
+
+.slave-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.slave-status-dot.online {
+  background-color: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.7);
+}
+
+.slave-status-dot.offline {
+  background-color: #ef4444;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.7);
+}
+
+.slave-status-dot.busy {
+  background-color: #f59e0b;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.7);
+}
+
+.slave-status-tag {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.slave-status-tag.is-online {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.slave-status-tag.is-offline {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.slave-status-tag.is-gw-offline {
+  background: rgba(148, 163, 184, 0.1);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.slave-status-tag.is-busy {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.slave-hero-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.6);
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.slave-hero-status-text {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.slave-hero-status-text.is-online { color: #10b981; }
+.slave-hero-status-text.is-offline { color: #f87171; }
+.slave-hero-status-text.is-gw-offline { color: #94a3b8; }
+.slave-hero-status-text.is-busy { color: #f59e0b; }
 
 .empty-child, .empty-tree {
   padding: 16px;

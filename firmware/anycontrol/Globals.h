@@ -22,7 +22,7 @@ static const int PIN_MASTER_TX  = 21;
 // -----------------------
 // 2. 常量定义
 // -----------------------
-#define FIRMWARE_VERSION "1.0.1"
+#define FIRMWARE_VERSION "1.0.2"
 
 static constexpr const char *WIFI_AP_SSID = "AnyControl_AP";
 static constexpr const char *WIFI_AP_PASSWORD = "12345678";
@@ -55,6 +55,7 @@ struct DualMasterConfig {
   uint8_t  masterParity; // 校验位 (0:None, 1:Even, 2:Odd)
   uint8_t  masterStop;   // 停止位 (1/2)
   uint16_t wifiPort;     // WiFi TCP Server 监听端口 (Master 2 访问端口，默认 9502)
+  uint16_t masterTimeout; // RS485 从站物理响应超时 (单位: ms，默认 1000)
 };
 
 // -----------------------

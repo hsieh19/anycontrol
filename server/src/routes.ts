@@ -214,6 +214,24 @@ apiRouter.post("/gateways/:id/pull-config", authenticate, async (req: Request, r
   }
 });
 
+apiRouter.post("/gateways/:id/probe-slaves", authenticate, async (req: Request, res: Response) => {
+  try {
+    const probeRes = await controlService.probeGatewaySlaves(req.params.id);
+    res.json({ success: true, data: probeRes });
+  } catch (e: any) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+apiRouter.post("/devices/:id/probe", authenticate, async (req: Request, res: Response) => {
+  try {
+    const probeRes = await controlService.probeDevice(req.params.id);
+    res.json({ success: true, data: probeRes });
+  } catch (e: any) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 apiRouter.get("/devices", authenticate, (req: Request, res: Response) => {
   res.json({ success: true, data: deviceService.getDevices() });
 });

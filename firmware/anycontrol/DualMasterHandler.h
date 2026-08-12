@@ -167,7 +167,10 @@ static void processWifiMasterClient(WiFiClient& client) {
                 if (!s_busBusy) {
                     s_busBusy = true;
                     uint8_t respBuf[260];
-                    size_t respLen = forwardAndCollectResponse(rtuFrame, len + 2, respBuf, sizeof(respBuf), 200);
+                    // 计算从站等待超时：零值回退 1000ms，上限约束 3000ms，防止总线互斥锁长时间占用
+                    uint16_t timeoutMs = g_dualMasterConfig.masterTimeout > 0 ? g_dualMasterConfig.masterTimeout : 1000;
+                    if (timeoutMs > 3000) timeoutMs = 3000;
+                    size_t respLen = forwardAndCollectResponse(rtuFrame, len + 2, respBuf, sizeof(respBuf), timeoutMs);
                     s_busBusy = false;
 
                     // 验证从站响应 CRC16 并发回 TCP 响应

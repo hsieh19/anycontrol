@@ -115,6 +115,7 @@ static void handleHttpRoot() {
   html += "</select></div>";
 
   html += "<div class='form-item'><label>WiFi TCP 端口:</label><input name='dmWPort' type='number' value='" + String(g_dualMasterConfig.wifiPort) + "' placeholder='默认 9502'></div>";
+  html += "<div class='form-item'><label>从站超时 (ms):</label><input name='dmTimeout' type='number' value='" + String(g_dualMasterConfig.masterTimeout) + "' placeholder='默认 1000'></div>";
   html += "<div class='form-item'><label>心跳周期 (秒):</label><input name='heartbeatInterval' type='number' value='" + String(g_heartbeatInterval) + "' placeholder='默认 30 秒'></div>";
   html += "</div>";
   g_httpServer.sendContent(html);
@@ -229,6 +230,7 @@ static void handleApiGatewayConfig() {
   uint8_t parity = 0;
   uint8_t stopBits = 0;
   uint16_t wifiPort = 0;
+  uint16_t masterTimeout = 0;
   uint32_t hbInt = 0;
 
   if (body.length() > 0) {
@@ -241,6 +243,8 @@ static void handleApiGatewayConfig() {
       if (doc.containsKey("parity")) parity = doc["parity"].as<uint8_t>();
       if (doc.containsKey("stopBits")) stopBits = doc["stopBits"].as<uint8_t>();
       if (doc.containsKey("wifiPort")) wifiPort = doc["wifiPort"].as<uint16_t>();
+      if (doc.containsKey("masterTimeout")) masterTimeout = doc["masterTimeout"].as<uint16_t>();
+      if (doc.containsKey("timeout")) masterTimeout = doc["timeout"].as<uint16_t>();
       if (doc.containsKey("heartbeatInterval")) hbInt = doc["heartbeatInterval"].as<uint32_t>();
     }
   } else {
@@ -250,6 +254,8 @@ static void handleApiGatewayConfig() {
     if (g_httpServer.hasArg("parity")) parity = g_httpServer.arg("parity").toInt();
     if (g_httpServer.hasArg("stopBits")) stopBits = g_httpServer.arg("stopBits").toInt();
     if (g_httpServer.hasArg("wifiPort")) wifiPort = g_httpServer.arg("wifiPort").toInt();
+    if (g_httpServer.hasArg("masterTimeout")) masterTimeout = g_httpServer.arg("masterTimeout").toInt();
+    if (g_httpServer.hasArg("timeout")) masterTimeout = g_httpServer.arg("timeout").toInt();
     if (g_httpServer.hasArg("heartbeatInterval")) hbInt = g_httpServer.arg("heartbeatInterval").toInt();
   }
 
@@ -282,6 +288,10 @@ static void handleApiGatewayConfig() {
     g_dualMasterConfig.wifiPort = wifiPort;
     g_prefs.putUShort("dmWPort", wifiPort);
   }
+  if (masterTimeout > 0) {
+    g_dualMasterConfig.masterTimeout = masterTimeout;
+    g_prefs.putUShort("dmTimeout", masterTimeout);
+  }
   // I4 修复：心跳周期保存条件与 handleHttpConfig 统一（hbInt > 0 且字段存在）
   bool hbIntPresent = (body.length() > 0)
     ? (body.indexOf("heartbeatInterval") >= 0)
@@ -306,6 +316,7 @@ static void handleApiGatewayConfig() {
   data["parity"] = g_dualMasterConfig.masterParity;
   data["stopBits"] = g_dualMasterConfig.masterStop;
   data["wifiPort"] = g_dualMasterConfig.wifiPort;
+  data["masterTimeout"] = g_dualMasterConfig.masterTimeout;
   data["heartbeatInterval"] = g_heartbeatInterval;
 
   String out;
@@ -338,12 +349,16 @@ static void handleHttpConfig() {
     g_dualMasterConfig.masterParity = g_httpServer.arg("dmParity").toInt();
     g_dualMasterConfig.masterStop   = g_httpServer.arg("dmStop").toInt();
     g_dualMasterConfig.wifiPort     = g_httpServer.arg("dmWPort").toInt();
+    if (g_httpServer.hasArg("dmTimeout")) {
+      g_dualMasterConfig.masterTimeout = g_httpServer.arg("dmTimeout").toInt();
+    }
 
     g_prefs.putUInt("dmBaud", g_dualMasterConfig.masterBaud);
     g_prefs.putUChar("dmData", g_dualMasterConfig.masterData);
     g_prefs.putUChar("dmParity", g_dualMasterConfig.masterParity);
     g_prefs.putUChar("dmStop", g_dualMasterConfig.masterStop);
     g_prefs.putUShort("dmWPort", g_dualMasterConfig.wifiPort);
+    g_prefs.putUShort("dmTimeout", g_dualMasterConfig.masterTimeout);
   }
 
   // WiFi 配置保存

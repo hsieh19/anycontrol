@@ -1,6 +1,6 @@
 {
   "name": "anycontrol-server",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Backend Gateway and Control Service for Modbus Industrial Control",
   "main": "dist/index.js",
   "scripts": {

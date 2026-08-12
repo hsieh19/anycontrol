@@ -18,28 +18,28 @@
               <span class="gw-title">{{ gw.name }}</span>
             </div>
 
-            <div class="meta-tags clickable-telemetry" @click.stop="openTelemetryModal(gw)" title="点击查看网关硬件状态与通讯延迟深度诊断">
+            <div class="meta-tags clickable-telemetry" @click.stop="openTelemetryModal(gw)" :title="gw.status === 'ONLINE' ? '点击查看网关硬件状态与通讯延迟深度诊断' : '网关处于离线状态（点击查看诊断详情）'">
               <span class="meta-tag font-mono text-cyan">
-                IP: {{ gw.ip }}
+                IP: {{ gw.ip }}:{{ gw.port || 9502 }}
               </span>
               <span class="meta-tag-count">
                 {{ getDevicesForGw(gw.id).length }} 台受控从站
               </span>
-              <!-- 遥测实时指标组 (点击查看详情) -->
-              <span class="meta-tag font-mono text-emerald">
-                📶 {{ gw.latencyMs !== undefined ? gw.latencyMs + 'ms' : '--' }}
+              <!-- 遥测实时指标组 (在线高亮展示，离线置灰显示 --) -->
+              <span class="meta-tag font-mono" :class="gw.status === 'ONLINE' ? 'text-emerald' : 'text-muted is-offline'">
+                📶 {{ gw.status === 'ONLINE' && gw.latencyMs !== undefined ? gw.latencyMs + 'ms' : '--' }}
               </span>
-              <span class="meta-tag font-mono text-amber">
-                📡 {{ gw.wifiRssi !== undefined ? gw.wifiRssi + 'dBm' : '--' }}
+              <span class="meta-tag font-mono" :class="gw.status === 'ONLINE' ? 'text-amber' : 'text-muted is-offline'">
+                📡 {{ gw.status === 'ONLINE' && gw.wifiRssi !== undefined ? gw.wifiRssi + 'dBm' : '--' }}
               </span>
-              <span class="meta-tag font-mono text-violet">
-                🧠 {{ gw.ramUsage !== undefined ? gw.ramUsage + '%' : '--' }}
+              <span class="meta-tag font-mono" :class="gw.status === 'ONLINE' ? 'text-violet' : 'text-muted is-offline'">
+                🧠 {{ gw.status === 'ONLINE' && gw.ramUsage !== undefined ? gw.ramUsage + '%' : '--' }}
               </span>
-              <span class="meta-tag font-mono text-rose">
-                🌡️ {{ gw.chipTemp !== undefined ? gw.chipTemp + '℃' : '--' }}
+              <span class="meta-tag font-mono" :class="gw.status === 'ONLINE' ? 'text-rose' : 'text-muted is-offline'">
+                🌡️ {{ gw.status === 'ONLINE' && gw.chipTemp !== undefined ? gw.chipTemp + '℃' : '--' }}
               </span>
               <span v-if="gw.lastSyncTime" class="meta-sync-time text-muted font-mono text-xs">
-                同步: {{ formatTime(gw.lastSyncTime) }}
+                同步: {{ formatTime(gw.lastSyncTime) }}<span v-if="gw.status !== 'ONLINE'" class="offline-tag"> (已断开)</span>
               </span>
             </div>
           </div>
@@ -94,6 +94,25 @@
                   <div class="dev-cell">
                     <span class="sub-branch-icon">↳</span>
                     <span class="font-semibold text-slate">{{ row.name }}</span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <el-table-column label="通信状态" width="140">
+                <template #default="{ row }">
+                  <div class="slave-status-badge">
+                    <span 
+                      class="slave-status-dot" 
+                      :class="gw.status !== 'ONLINE' ? 'offline' : (row.status === 'ONLINE' ? 'online' : (row.status === 'OFFLINE' ? 'offline' : (row.status === 'BUSY' ? 'busy' : 'unknown')))"
+                    ></span>
+                    <el-tag 
+                      size="small" 
+                      :type="gw.status !== 'ONLINE' ? 'info' : (row.status === 'ONLINE' ? 'success' : (row.status === 'OFFLINE' ? 'danger' : (row.status === 'BUSY' ? 'warning' : 'info')))"
+                      effect="plain"
+                      class="slave-status-tag font-mono"
+                    >
+                      {{ gw.status !== 'ONLINE' ? '网关离线' : (row.status === 'ONLINE' ? '正常在线' : (row.status === 'OFFLINE' ? '总线离线' : (row.status === 'BUSY' ? '通讯中' : '待检测')) ) }}
+                    </el-tag>
                   </div>
                 </template>
               </el-table-column>
@@ -166,7 +185,12 @@
         </el-form-item>
 
         <el-form-item label="网关 IP 地址" required>
-          <el-input v-model="editingGw.ip" placeholder="例如: 172.17.213.113" />
+          <el-input v-model="editingGw.ip" placeholder="例如: 172.17.213.205" />
+        </el-form-item>
+
+        <el-form-item label="Modbus 端口" required>
+          <el-input-number v-model="editingGw.port" :min="1" :max="65535" style="width: 100%" placeholder="默认 9502" />
+          <span class="input-tip">上位机 Modbus 业务通信与指令下发端口 (对应固件 WiFi TCP 端口，默认 9502)</span>
         </el-form-item>
 
         <el-form-item label="RS485 波特率">
@@ -202,9 +226,28 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item label="心跳保活周期">
-          <el-input-number v-model="editingGw.heartbeatInterval" :min="5" :max="3600" style="width: 100%" />
-          <span class="input-tip">硬件固件心跳保活周期 (单位: 秒，默认 30)</span>
+        <el-form-item label="超时 / 心跳">
+          <div style="display: flex; gap: 12px; width: 100%; align-items: flex-start;">
+            <div style="flex: 1;">
+              <el-input-number 
+                v-model="editingGw.timeout" 
+                :min="100" 
+                :max="10000" 
+                :step="100" 
+                style="width: 100%" 
+              />
+              <span class="input-tip">从站响应超时 (毫秒, 默认 1000)</span>
+            </div>
+            <div style="flex: 1;">
+              <el-input-number 
+                v-model="editingGw.heartbeatInterval" 
+                :min="5" 
+                :max="3600" 
+                style="width: 100%" 
+              />
+              <span class="input-tip">心跳保活周期 (秒, 默认 30)</span>
+            </div>
+          </div>
         </el-form-item>
 
         <el-form-item label="备注说明">
@@ -307,6 +350,10 @@
               <span class="p-val font-mono font-bold">{{ targetPushGw.stopBits || 1 }} 位</span>
             </div>
             <div class="param-item">
+              <span class="p-name">从站响应超时</span>
+              <span class="p-val font-mono font-bold text-amber">{{ targetPushGw.timeout || 1000 }} ms</span>
+            </div>
+            <div class="param-item">
               <span class="p-name">心跳保活周期</span>
               <span class="p-val font-mono font-bold">{{ targetPushGw.heartbeatInterval || 30 }} 秒</span>
             </div>
@@ -343,81 +390,121 @@
       width="640px"
       class="telemetry-modal"
     >
-      <div v-if="currentTelemetry" class="telemetry-body">
-        <div class="telemetry-header-card">
+      <div v-if="currentTelemetry" class="telemetry-body" v-loading="telemetryLoading">
+        <!-- 离线告警横幅 -->
+        <div v-if="!currentTelemetry.isOnline" class="offline-warning-banner">
+          <div class="banner-icon">⚠️</div>
+          <div class="banner-text">
+            <div class="banner-title">网关当前处于离线状态</div>
+            <div class="banner-desc">上位机与现场硬件通信中断，无法拉取实时遥测数据与双主站总线吞吐指标。</div>
+          </div>
+        </div>
+
+        <div class="telemetry-header-card" :class="{ 'is-offline-card': !currentTelemetry.isOnline }">
           <div class="gw-name-row">
-            <span class="gw-title font-bold text-cyan">{{ currentTelemetry.gwName }}</span>
-            <el-tag type="success" size="small" class="font-mono">固件 {{ currentTelemetry.report.firmware }}</el-tag>
+            <span class="gw-title font-bold" :class="currentTelemetry.isOnline ? 'text-cyan' : 'text-slate'">
+              {{ currentTelemetry.gwName }}
+            </span>
+            <el-tag :type="currentTelemetry.isOnline ? 'success' : 'danger'" size="small" class="font-mono">
+              {{ currentTelemetry.isOnline ? `固件 ${currentTelemetry.report?.firmware || 'v2.0.0'}` : '状态: 离线 OFFLINE' }}
+            </el-tag>
           </div>
           <div class="gw-ip-row font-mono text-muted text-xs">
-            IP: {{ currentTelemetry.gwIp }} | 同步于: {{ formatTime(currentTelemetry.syncedAt) }}
+            IP: {{ currentTelemetry.gwIp }} | 
+            <span v-if="currentTelemetry.isOnline && currentTelemetry.syncedAt">
+              最新同步: {{ formatTime(currentTelemetry.syncedAt) }}
+            </span>
+            <span v-else class="text-rose font-semibold">
+              通信状态: 已断开 ({{ formatTime(currentTelemetry.syncedAt) }})
+            </span>
           </div>
         </div>
 
         <div class="telemetry-grid">
           <!-- 延迟指标 -->
-          <div class="stat-card">
+          <div class="stat-card" :class="{ disabled: !currentTelemetry.isOnline }">
             <div class="stat-label">📶 网络往返延迟</div>
-            <div class="stat-value font-mono text-emerald">
-              {{ currentTelemetry.report.networkLatencyMs }} <span class="unit">ms</span>
+            <div class="stat-value font-mono" :class="currentTelemetry.isOnline ? 'text-emerald' : 'text-muted'">
+              {{ currentTelemetry.isOnline && currentTelemetry.report?.networkLatencyMs !== undefined ? currentTelemetry.report.networkLatencyMs : '--' }}
+              <span v-if="currentTelemetry.isOnline && currentTelemetry.report?.networkLatencyMs !== undefined" class="unit">ms</span>
             </div>
             <div class="stat-tip">上位机至网关 HTTP 通信耗时</div>
           </div>
 
-          <div class="stat-card">
+          <div class="stat-card" :class="{ disabled: !currentTelemetry.isOnline }">
             <div class="stat-label">⚡ RS485 总线应答延迟</div>
-            <div class="stat-value font-mono text-cyan">
-              {{ currentTelemetry.report.busLatencyMs }} <span class="unit">ms</span>
+            <div class="stat-value font-mono" :class="currentTelemetry.isOnline ? 'text-cyan' : 'text-muted'">
+              {{ currentTelemetry.isOnline && currentTelemetry.report?.busLatencyMs !== undefined ? currentTelemetry.report.busLatencyMs : '--' }}
+              <span v-if="currentTelemetry.isOnline && currentTelemetry.report?.busLatencyMs !== undefined" class="unit">ms</span>
             </div>
             <div class="stat-tip">网关与物理从站通信耗时</div>
           </div>
 
           <!-- 硬件健康 -->
-          <div class="stat-card">
+          <div class="stat-card" :class="{ disabled: !currentTelemetry.isOnline }">
             <div class="stat-label">📡 WiFi 信号强度</div>
-            <div class="stat-value font-mono text-amber">
-              {{ currentTelemetry.report.rssi }} <span class="unit">dBm</span>
+            <div class="stat-value font-mono" :class="currentTelemetry.isOnline ? 'text-amber' : 'text-muted'">
+              {{ currentTelemetry.isOnline && currentTelemetry.report?.rssi !== undefined ? currentTelemetry.report.rssi : '--' }}
+              <span v-if="currentTelemetry.isOnline && currentTelemetry.report?.rssi !== undefined" class="unit">dBm</span>
             </div>
             <div class="stat-tip">现场无线接入质量</div>
           </div>
 
-          <div class="stat-card">
+          <div class="stat-card" :class="{ disabled: !currentTelemetry.isOnline }">
             <div class="stat-label">🌡️ ESP32 芯片温度</div>
-            <div class="stat-value font-mono text-rose">
-              {{ currentTelemetry.report.chipTemp }} <span class="unit">℃</span>
+            <div class="stat-value font-mono" :class="currentTelemetry.isOnline ? 'text-rose' : 'text-muted'">
+              {{ currentTelemetry.isOnline && currentTelemetry.report?.chipTemp !== undefined ? currentTelemetry.report.chipTemp : '--' }}
+              <span v-if="currentTelemetry.isOnline && currentTelemetry.report?.chipTemp !== undefined" class="unit">℃</span>
             </div>
             <div class="stat-tip">硬件内部结温监控</div>
           </div>
 
-          <div class="stat-card">
+          <div class="stat-card" :class="{ disabled: !currentTelemetry.isOnline }">
             <div class="stat-label">🧠 内存使用率</div>
-            <div class="stat-value font-mono text-violet">
-              {{ currentTelemetry.report.ram }} <span class="unit">%</span>
+            <div class="stat-value font-mono" :class="currentTelemetry.isOnline ? 'text-violet' : 'text-muted'">
+              {{ currentTelemetry.isOnline && currentTelemetry.report?.ram !== undefined ? currentTelemetry.report.ram : '--' }}
+              <span v-if="currentTelemetry.isOnline && currentTelemetry.report?.ram !== undefined" class="unit">%</span>
             </div>
             <div class="stat-tip">堆内存动态健康监测</div>
           </div>
 
-          <div class="stat-card">
+          <div class="stat-card" :class="{ disabled: !currentTelemetry.isOnline }">
             <div class="stat-label">⏱️ 连续开机运行时间</div>
-            <div class="stat-value font-mono text-indigo font-semibold" style="font-size: 1.05rem;">
-              {{ currentTelemetry.report.uptime }}
+            <div class="stat-value font-mono" :class="currentTelemetry.isOnline ? 'text-indigo' : 'text-muted'" style="font-size: 1.05rem;">
+              {{ currentTelemetry.isOnline && currentTelemetry.report?.uptime ? currentTelemetry.report.uptime : '设备离线 / 未建立连接' }}
             </div>
             <div class="stat-tip">自上次通电以来的运行时间</div>
           </div>
 
           <!-- 中继吞吐 -->
-          <div class="stat-card" style="grid-column: span 2;">
+          <div class="stat-card" :class="{ disabled: !currentTelemetry.isOnline }" style="grid-column: span 2;">
             <div class="stat-label">🔄 双主站中继调度与错误统计</div>
-            <div class="dual-stat-row font-mono">
-              <span>物理主站 (RS485_A): <b class="text-cyan">{{ currentTelemetry.report.master1Frames }}</b> 帧</span>
-              <span>WiFi 主站 (Master 2): <b class="text-emerald">{{ currentTelemetry.report.master2Frames }}</b> 帧</span>
-              <span :class="currentTelemetry.report.busCrcErrors > 0 ? 'text-danger' : 'text-success'">CRC 错误: <b>{{ currentTelemetry.report.busCrcErrors }}</b></span>
+            <div class="dual-stat-row font-mono" v-if="currentTelemetry.isOnline && currentTelemetry.report">
+              <span>物理主站 (RS485_A): <b class="text-cyan">{{ currentTelemetry.report.master1Frames ?? 0 }}</b> 帧</span>
+              <span>WiFi 主站 (Master 2): <b class="text-emerald">{{ currentTelemetry.report.master2Frames ?? 0 }}</b> 帧</span>
+              <span :class="(currentTelemetry.report.busCrcErrors || 0) > 0 ? 'text-danger' : 'text-success'">CRC 错误: <b>{{ currentTelemetry.report.busCrcErrors ?? 0 }}</b></span>
+            </div>
+            <div class="dual-stat-row font-mono text-muted" v-else>
+              <span>物理主站: --</span>
+              <span>WiFi 主站: --</span>
+              <span>CRC 错误: --</span>
             </div>
           </div>
         </div>
       </div>
       <template #footer>
-        <el-button type="primary" @click="telemetryDialogVisible = false">关闭</el-button>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <el-button 
+            size="small" 
+            type="primary" 
+            plain 
+            :loading="telemetryLoading"
+            @click="currentTelemetryGw && fetchTelemetry(currentTelemetryGw)"
+          >
+            🔄 重新检测网关
+          </el-button>
+          <el-button type="primary" @click="telemetryDialogVisible = false">关闭</el-button>
+        </div>
       </template>
     </el-dialog>
   </div>
@@ -518,21 +605,49 @@ const silentHeartbeatCheck = async (gw: Gateway) => {
       }
     } else {
       gw.status = 'OFFLINE';
+      gw.latencyMs = undefined;
     }
   } catch {
     gw.status = 'OFFLINE';
+    gw.latencyMs = undefined;
   }
 };
 
 let heartbeatTimer: any = null;
+const heartbeatCycleCount = ref(0);
+
+const silentProbeSlavesForGw = async (gwId: string) => {
+  try {
+    const res = await api.probeGatewaySlaves(gwId);
+    if (res && res.results) {
+      res.results.forEach(r => {
+        const target = devices.value.find(d => d.id === r.deviceId);
+        if (target) target.status = r.status;
+      });
+      await store.refreshAll();
+    }
+  } catch (e) {
+    console.warn(`[Auto Probe] 自动从站探活跳过:`, e);
+  }
+};
 
 const startHeartbeatPolling = () => {
   stopHeartbeatPolling();
-  heartbeatTimer = setInterval(() => {
-    gateways.value.forEach(gw => {
-      silentHeartbeatCheck(gw);
-    });
-  }, 15000); // 每 15 秒静默轮询一次最新遥测与网络延迟
+  heartbeatTimer = setInterval(async () => {
+    heartbeatCycleCount.value++;
+    // 每 5 个心跳周期自动后台探测一次受控从站
+    const shouldProbeSlaves = heartbeatCycleCount.value % 5 === 0;
+
+    // 并行执行各网关心跳，避免串行 await 导致竞态（单网关超时不阻塞其他网关）
+    await Promise.allSettled(
+      gateways.value.map(async (gw) => {
+        await silentHeartbeatCheck(gw);
+        if (gw.status === 'ONLINE' && shouldProbeSlaves) {
+          silentProbeSlavesForGw(gw.id);
+        }
+      })
+    );
+  }, 15000); // 每 15 秒为一个心跳周期 (5个周期 = 75秒自动轮询一次从站总线)
 };
 
 const stopHeartbeatPolling = () => {
@@ -588,61 +703,118 @@ const confirmAndExecutePush = async () => {
 
 // 遥测诊断弹窗
 const telemetryDialogVisible = ref(false);
-const currentTelemetry = ref<{ gwName: string; gwIp: string; syncedAt: string; report: any } | null>(null);
+const telemetryLoading = ref(false);
+const currentTelemetryGw = ref<Gateway | null>(null);
+const currentTelemetry = ref<{ 
+  gwName: string; 
+  gwIp: string; 
+  isOnline: boolean; 
+  syncedAt: string; 
+  report: any | null 
+} | null>(null);
+
+const fetchTelemetry = async (gw: Gateway) => {
+  telemetryLoading.value = true;
+  try {
+    const res = await api.pullConfigFromGateway(gw.id);
+    if (res.isOnline && res.deviceReport) {
+      gw.status = 'ONLINE';
+      if (res.deviceReport.networkLatencyMs !== undefined) {
+        gw.latencyMs = res.deviceReport.networkLatencyMs;
+      }
+      if (res.deviceReport.rssi !== undefined) {
+        gw.wifiRssi = res.deviceReport.rssi;
+      }
+      if (res.deviceReport.ram !== undefined) {
+        gw.ramUsage = res.deviceReport.ram;
+      }
+      if (res.deviceReport.chipTemp !== undefined) {
+        gw.chipTemp = res.deviceReport.chipTemp;
+      }
+      currentTelemetry.value = {
+        gwName: gw.name,
+        gwIp: gw.ip,
+        isOnline: true,
+        syncedAt: res.syncedAt,
+        report: res.deviceReport
+      };
+    } else {
+      gw.status = 'OFFLINE';
+      gw.latencyMs = undefined;
+      currentTelemetry.value = {
+        gwName: gw.name,
+        gwIp: gw.ip,
+        isOnline: false,
+        syncedAt: res.syncedAt || gw.lastSyncTime || new Date().toISOString(),
+        report: null
+      };
+    }
+  } catch {
+    gw.status = 'OFFLINE';
+    gw.latencyMs = undefined;
+    currentTelemetry.value = {
+      gwName: gw.name,
+      gwIp: gw.ip,
+      isOnline: false,
+      syncedAt: gw.lastSyncTime || new Date().toISOString(),
+      report: null
+    };
+  } finally {
+    telemetryLoading.value = false;
+  }
+};
 
 const openTelemetryModal = async (gw: Gateway) => {
+  currentTelemetryGw.value = gw;
+  const isOnline = gw.status === 'ONLINE';
   currentTelemetry.value = {
     gwName: gw.name,
     gwIp: gw.ip,
+    isOnline,
     syncedAt: gw.lastSyncTime || new Date().toISOString(),
-    report: {
+    report: isOnline ? {
       firmware: gw.firmwareVersion || 'v2.0.0',
-      networkLatencyMs: gw.latencyMs || 15,
-      busLatencyMs: 38,
-      rssi: gw.wifiRssi || -58,
-      chipTemp: gw.chipTemp || 36.2,
-      ram: gw.ramUsage || 42,
+      networkLatencyMs: gw.latencyMs,
+      busLatencyMs: 25,
+      rssi: gw.wifiRssi,
+      chipTemp: gw.chipTemp,
+      ram: gw.ramUsage,
       uptime: '正常运行中',
       master1Frames: 0,
       master2Frames: 0,
       busCrcErrors: 0
-    }
+    } : null
   };
   telemetryDialogVisible.value = true;
-  
-  // 静默拉取最新详细指标
-  try {
-    const res = await api.pullConfigFromGateway(gw.id);
-    if (res.success) {
-      currentTelemetry.value = {
-        gwName: gw.name,
-        gwIp: gw.ip,
-        syncedAt: res.syncedAt,
-        report: res.deviceReport
-      };
-    }
-  } catch {}
+  await fetchTelemetry(gw);
 };
 
 // Gateway Modal Handlers
 const openGatewayDialog = (gw?: Gateway) => {
   if (gw) {
+    // 只列出已知字段，避免 ...gw 展开时脏字段污染 editingGw
     Object.assign(editingGw, {
-      ...gw,
+      id: gw.id,
+      name: gw.name || '',
+      ip: gw.ip || '',
       managementPort: gw.managementPort || 80,
+      port: gw.port || 9502,
+      timeout: gw.timeout || 1000,
       baud: gw.baud || 9600,
       dataBits: gw.dataBits || 8,
       parity: gw.parity !== undefined ? gw.parity : 0,
       stopBits: gw.stopBits || 1,
-      heartbeatInterval: gw.heartbeatInterval || 30
+      heartbeatInterval: gw.heartbeatInterval || 30,
+      description: gw.description || ''
     });
   } else {
     Object.assign(editingGw, {
       id: undefined,
       name: '',
-      ip: '172.17.213.113',
+      ip: '172.17.213.205',
       managementPort: 80,
       port: 9502,
+      timeout: 1000,
       baud: 9600,
       dataBits: 8,
       parity: 0,
@@ -741,8 +913,13 @@ const handleDeleteDevice = (dev: ControlledDevice) => {
 
 onMounted(async () => {
   await loadData();
-  // 初次加载后立即静默探活一次
-  gateways.value.forEach(gw => silentHeartbeatCheck(gw));
+  // 初次加载后立即静默探活网关与从站
+  for (const gw of gateways.value) {
+    await silentHeartbeatCheck(gw);
+    if (gw.status === 'ONLINE') {
+      silentProbeSlavesForGw(gw.id);
+    }
+  }
   startHeartbeatPolling();
 });
 
@@ -1144,4 +1321,99 @@ onUnmounted(() => {
 .text-indigo { color: #6366f1; }
 .text-danger { color: #ef4444; }
 .text-success { color: #10b981; }
+
+.offline-warning-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  margin-bottom: 14px;
+}
+
+.offline-warning-banner .banner-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.offline-warning-banner .banner-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f87171;
+  margin-bottom: 2px;
+}
+
+.offline-warning-banner .banner-desc {
+  font-size: 12px;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+.is-offline-card {
+  border-color: rgba(239, 68, 68, 0.25) !important;
+  background: rgba(15, 23, 42, 0.7) !important;
+}
+
+.stat-card.disabled {
+  opacity: 0.55;
+  border-color: rgba(255, 255, 255, 0.04);
+}
+
+.is-offline {
+  opacity: 0.6;
+  color: var(--text-muted) !important;
+}
+
+.offline-tag {
+  color: #f87171;
+  font-weight: 600;
+}
+
+.slave-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.slave-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.slave-status-dot.online {
+  background-color: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+}
+
+.slave-status-dot.offline {
+  background-color: #ef4444;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+}
+
+.slave-status-dot.busy {
+  background-color: #f59e0b;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
+}
+
+.slave-status-dot.unknown {
+  background-color: #94a3b8;
+  box-shadow: 0 0 6px rgba(148, 163, 184, 0.4);
+}
+
+.slave-status-tag {
+  font-size: 11px;
+}
+
+.sub-table-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(15, 23, 42, 0.4);
+  border-bottom: 1px solid var(--border-color);
+}
 </style>
