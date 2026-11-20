@@ -1,6 +1,0 @@
-{
-  "version": "1.0.2",
-  "name": "AnyControl 工业智能网关固件",
-  "chip": "ESP32C3",
-  "project": "anycontrol"
-}

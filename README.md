@@ -1,18 +1,19 @@
 # ⚡ AnyControl (工业智能网关与控制审计平台)
 
+[![Version: 1.0.3](https://img.shields.io/badge/Version-1.0.3-brightgreen.svg)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node: >=20](https://img.shields.io/badge/Node->=20-green.svg)](https://nodejs.org/)
-[![Hardware: ESP32-C3](https://img.shields.io/badge/Hardware-ESP32--C3-red.svg)](https://www.espressif.com/)
+[![Gateway: AnyPort-ESP32](https://img.shields.io/badge/Gateway-AnyPort--ESP32-red.svg)](https://github.com/hsieh19/anyport-esp32)
 [![Database: SQLite WAL](https://img.shields.io/badge/Database-SQLite%20WAL-orange.svg)](https://www.sqlite.org/)
 
-**AnyControl** 是一套面向现代工业现场的高可靠设备控制、参数下发与操作全量审计平台。系统深度融合了 **ESP32-C3 双主站中继网关固件** 与 **Node.js/TypeScript/Vue 3 边缘工控软件栈**，彻底解决了工业现场“多主站总线竞争冲突”、“下发控制无物理闭环验证”以及“现场操作缺失责任审计”等核心痛点。
+**AnyControl** 是一套面向现代工业现场的高可靠设备控制、参数下发与操作全量审计平台。系统与 **[AnyPort-ESP32](https://github.com/hsieh19/anyport-esp32)**（Mode 6 双主站中继网关）深度联动，基于现代化 **Node.js/TypeScript/Vue 3 边缘工控软件栈**，彻底解决了工业现场“多主站总线竞争冲突”、“下发控制无物理闭环验证”以及“现场操作缺失责任审计”等核心痛点。
 
 ---
 
 ## 🌟 核心特性
 
 ### 1. 🛡️ 工业级双主站无冲突中继 (Dual-Master Relay)
-- **物理与逻辑解耦**：硬件网关同时连接**原物理主站/触摸屏**（RS485_A，UART0）与**现场从站总线**（RS485_B，UART1）。
+- **物理与逻辑解耦**：硬件网关同时连接**原物理主站/触摸屏**（RS485_A）与**现场从站总线**（RS485_B）。
 - **云端/上位机并发接入**：WiFi 开启 TCP Server（端口 9502）作为上位机接入通道（Master 2）。
 - **微秒级互斥调度**：网关内部自适应抢占与断帧调度，避免两路主站同时发送造成总线碰撞与乱码。
 
@@ -31,14 +32,14 @@
 - **飞书 SSO 免登**：支持企业自建飞书应用扫码登录与 OAuth 授权免登。
 - **安全灾备**：系统全量配置一键导出与灾难恢复（仅限系统管理员）。
 
-### 5. ⚡ 嵌入式双分区在线更新 (A/B OTA)
-- **A/B 分区无缝热升级**：固件内置 OTA 检测与双分区切换机制，升级失败或异常支持一键回滚历史版本。
+### 5. ⚡ 网关固件协同与在线维护
+- **全生命周期维护**：配套网关基于 AnyPort-ESP32 架构，支持通过 Web 界面或云端进行在线配置热重载与 A/B 分区 OTA 升级。
 
 ---
 
 ## 📐 系统架构与拓扑
 
-```
+```text
  ┌─────────────────────────────────────────────────────────────┐
  │                AnyControl 前端控制台 (Vue 3 SPA)             │
  └──────────────────────────────┬──────────────────────────────┘
@@ -48,13 +49,13 @@
  │   - JWT 鉴权中间件        - Modbus Client 串行排队           │
  │   - SQLite (WAL模式)      - WebSocket 实时广播服务           │
  └──────────────────────────────┬──────────────────────────────┘
-                                │ Modbus TCP (Port: 9502)
+                                │ Modbus TCP (Port: 9502 / Master 2)
  ┌──────────────────────────────▼──────────────────────────────┐
- │             ESP32-C3 智能中继网关 (AnyControl 固件)           │
- │  ┌──────────────────────┐        ┌───────────────────────┐  │
- │  │ UART0 (GPIO20/21)    │        │ UART1 (GPIO2/10)      │  │
- │  │ 原物理主站/触摸屏(A)  │        │ 现场物理从站总线 (B)  │  │
- │  └──────────────────────┘        └───────────────────────┘  │
+ │         AnyPort-ESP32 智能中继网关 (Mode 6: DualMasterMode)   │
+ │  ┌────────────────────────┐     ┌────────────────────────┐  │
+ │  │   原物理主站 / 触摸屏   │     │    现场物理从站总线    │  │
+ │  │       (Master 1)       │     │     (Modbus Slaves)    │  │
+ │  └────────────────────────┘     └────────────────────────┘  │
  └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -67,7 +68,7 @@
 | **前端 (Client)** | Vue 3 + TypeScript + Vite + Pinia + Element Plus | 现代化响应式工业监控界面 |
 | **后端 (Server)** | Node.js + Express + TypeScript + `better-sqlite3` + `modbus-serial` | 高并发、高可靠工控后端 |
 | **存储 (Database)** | SQLite 3 (WAL 模式) | 单文件便携部署、ACID 事务、掉电安全 |
-| **固件 (Firmware)** | ESP32-C3 + Arduino Core / ESP-IDF | 双串口中继、WebServer、A/B OTA |
+| **配套网关 (Gateway)** | [AnyPort-ESP32 (Mode 6)](https://github.com/hsieh19/anyport-esp32) | 硬件双 RS485 物理隔离、TCP 互斥仲裁、热重载与在线 OTA |
 | **容器化 (DevOps)** | Docker + Docker Compose (基于 Alpine 多阶段构建) | 极致轻量化生产部署 |
 
 ---
@@ -124,16 +125,13 @@ docker compose up -d --build
 
 ---
 
-## 🔌 固件烧录与硬件引脚说明 (ESP32-C3)
+## 🔌 配套硬件网关 (AnyPort-ESP32)
 
-| 引脚功能 | GPIO 编号 | 物理连接 |
-| :--- | :--- | :--- |
-| **RS485_A RX** (原主站) | `GPIO20` | 连接原触摸屏/主站 RS485 转换芯片 RO |
-| **RS485_A TX** (原主站) | `GPIO21` | 连接原触摸屏/主站 RS485 转换芯片 DI |
-| **RS485_B RX** (现场从站) | `GPIO2` | 连接现场从站总线 RS485 转换芯片 RO |
-| **RS485_B TX** (现场从站) | `GPIO10` | 连接现场从站总线 RS485 转换芯片 DI |
+AnyControl 上位机系统通过标准 Modbus TCP（默认端口 `9502`）与现场智能网关通信。
 
-使用 Arduino IDE 或 PlatformIO 打开 `firmware/firmware.ino`，选择开发板 **ESP32C3 Dev Module** 编译并烧录即可。
+所有网关硬件选型、接线引脚定义、固件源码编译及 Web 在线烧录/OTA 均由 **[AnyPort-ESP32](https://github.com/hsieh19/anyport-esp32)** 项目统一发布与维护。
+
+现场部署时，仅需将网关切换至 **模式 6（双主站防碰撞中继网关 / `DualMasterMode`）**，在 AnyControl 后台填写网关 IP 即可原生接入，实现无冲突的并联控制与闭环审计。
 
 ---
 
@@ -151,13 +149,10 @@ anycontrol/
 │   ├── src/middleware/  # JWT 身份认证与角色鉴权中间件
 │   ├── src/services/    # 设备服务、控制服务、协议服务、用户审计服务
 │   └── src/routes.ts    # RESTful API 路由
-├── firmware/            # ESP32-C3 双主站中继网关固件源码
-│   ├── Config.h         # 硬件引脚与顶层生命周期
-│   ├── DualMasterHandler.h # 双主站无冲突中继核心调度器
-│   ├── OtaHandler.h     # A/B 分区在线升级与回滚
-│   └── WebHandler.h     # 嵌入式 Web 配置与状态监控页面
 ├── Dockerfile           # 生产级多阶段构建 Dockerfile
 └── docker-compose.yml   # 容器化部署编排配置
+
+> 💡 **提示**：现场网关固件统一由 [AnyPort-ESP32](https://github.com/hsieh19/anyport-esp32) 项目（模式 6）独立开发与发布，AnyControl 不再包含任何硬件固件代码。
 ```
 
 ---

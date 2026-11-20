@@ -2,7 +2,25 @@
 
 本文件专门记录 **AnyControl 工业控制与审计软件平台**（包含 Vue 3 前端界面、Node.js/TS 核心服务与 SQLite 数据库）的版本变更记录，遵循 [Semantic Versioning (语义化版本 2.0.0)](https://semver.org/lang/zh-CN/) 规范。
 
-*(注：ESP32-C3 嵌入式固件的变更日志请参阅 [firmware/CHANGELOG.md](firmware/CHANGELOG.md))*
+*(注：配套嵌入式网关固件已迁移至 [AnyPort-ESP32](https://github.com/hsieh19/anyport-esp32) 项目的 Mode 6 统一维护与发布)*
+
+---
+
+## [v1.0.3] - 2026-11-20
+
+### 🏗️ 架构解耦与重构 (Refactored & Changed)
+- **嵌入式固件解耦与统一迁移**：
+  - 原嵌入式双主站中继网关固件（ESP32-C3）及其编译发布流水线全面迁移至 [AnyPort-ESP32](https://github.com/hsieh19/anyport-esp32) 项目的 **Mode 6 (`DualMasterMode`)** 统一维护；
+  - 彻底解耦上位机软件平台与硬件固件源码工程，消除双源维护与版本冲突风险。
+- **仓库极致轻量化与环境清理**：
+  - 彻底移除本地 `firmware/` 目录源码及 `.github/workflows/firmware_publish.yml` 工作流；
+  - 清理跨工程调试遗留的临时 Worker 脚本（`firmawe-worker.js` 与 `worker.js`）；
+  - 精简并规范 `.dockerignore` 和 `.gitignore` 规则，仅保留上位机工控核心。
+
+### 📚 文档与规范演进 (Documentation)
+- **技术栈与架构拓扑重定向**：
+  - 更新 [README.md](README.md) 技术栈架构，指引网关硬件固件烧录及 OTA 从 `AnyPort-ESP32` 获取最新产物；
+  - 明确系统定位为纯粹、高可靠的工业设备控制、闭环校验与全量审计平台。
 
 ---
 

@@ -41,8 +41,7 @@ server/data/*.db-shm
 *.db-shm
 data/
 
-# 嵌入式固件编译产物 (如有临时构建)
-firmware/build/
+# 嵌入式固件编译产物已迁移至 AnyPort-ESP32 统一管理
 *.bin
 *.hex
 *.elf

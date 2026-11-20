@@ -17,8 +17,6 @@ server/dist
 *.log
 logs
 
-# 固件代码 (固件烧录在 ESP32 硬件上，无需打入上位机容器)
-firmware/
 
 # IDE 与系统临时文件
 .vscode
